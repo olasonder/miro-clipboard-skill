@@ -1,0 +1,4 @@
+*.capture.json
+*-decoded.json
+__pycache__/
+.DS_Store
