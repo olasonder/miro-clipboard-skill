@@ -1,4 +1,4 @@
-*.capture.json
-*-decoded.json
+*.json
+!examples/notes.json
 __pycache__/
 .DS_Store
