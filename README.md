@@ -1,10 +1,10 @@
 # Miro clipboard skill
 
-A Codex skill that bridges local tools and Miro through the macOS clipboard. A local agent can interpret a copied selection, restructure it, and write editable notes, shapes, text, and connectors back to the clipboard for paste in Miro. It uses the observed `miro-data-v1` format. Miro does not document this format, so behavior may change.
+A local-agent skill that bridges tools and Miro through the macOS clipboard. Any local LLM or script with file and clipboard access can interpret a copied selection, restructure it, and write editable notes, shapes, text, and connectors back to the clipboard for paste in Miro. It uses the observed `miro-data-v1` format. Miro does not document this format, so behavior may change.
 
-Copy this repository to your Codex skills directory as `miro-clipboard`, then invoke `$miro-clipboard` or ask Codex to work with a Miro selection. Python 3 and macOS Swift/AppKit are required. No Miro API token or external package is needed.
+Copy this repository into the skills directory of an agent that supports `SKILL.md` (for example, Codex), or call the scripts directly from any local tool. The skill name is `miro-clipboard`. Python 3 and macOS Swift/AppKit are required. No Miro API token or external package is needed.
 
-The user copies a selection in Miro, captures it locally with `scripts/miro-clipboard-lab.swift`, and shares the capture path with Codex. Codex can summarize or edit the selected objects, or compose new objects from copied samples. The user replays the output capture and pastes it in Miro. Paste creates a new copy rather than changing existing board objects.
+The user copies a selection in Miro and captures it locally with `scripts/miro-clipboard-lab.swift`. A local agent can summarize or edit the selected objects, or compose new objects from copied samples. The output capture is replayed to the clipboard and pasted in Miro. Paste creates a new copy rather than changing existing board objects.
 
 ```sh
 swift scripts/miro-clipboard-lab.swift capture /path/selection.capture.json
