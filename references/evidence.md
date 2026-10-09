@@ -24,6 +24,8 @@ Observed with disposable Miro boards and invented content, in Chrome on macOS, S
     - two stickies at the same `y` but different sizes had level centres, so `x, y` is the centre;
     - three pink stickies joined by connectors, using a connector merged in from the three-week-old capture; the connectors stayed attached and curved along when the middle sticky was moved.
 
+13. **9 October 2026, stress test.** An agent with only the skill as documentation turned a messy 24-note workshop wall into a 64-object synthesis: recoloured notes, merged duplicates, a parked area, an extended legend as a group, an assumption-to-test map with two decision diamonds and four labelled connectors, and a corrected process flow, all in a frame. It pasted cleanly. The objects did not move with the frame until `_parent` links were added; with them, all 63 moved with the frame. The legend group (five stickies and a text box) moved as one piece. A follow-up showed that `fs` with `fsa: 0` gives stickies one fixed text size.
+
 A visual pass means the objects appeared. Behaviour (editing, moving, persistence after reload) is confirmed only where stated.
 
 ## Confirmed by local checks only
@@ -39,5 +41,5 @@ A visual pass means the objects appeared. Behaviour (editing, moving, persistenc
 - The meaning of individual line style values (`ls`, `lt`) and of several shape and sticky style keys; each was changed only together with others, or not at all.
 - Rich text (bold, lists, links) inside stickies.
 - Pasting on another board or in another organisation. Reuse three weeks later on the same board worked for stickies, shapes and connectors; resource-based objects (images, data tables) are the most likely to fail elsewhere.
-- Child edits and ungrouping for generated groups; objects becoming frame children.
+- Child edits and ungrouping for generated groups; frames nested in frames.
 - Behaviour in browsers other than Chrome, and in future Miro versions.

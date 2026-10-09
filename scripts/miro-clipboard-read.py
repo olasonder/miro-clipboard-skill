@@ -100,6 +100,65 @@ def validate_references(document: dict) -> None:
                     raise ValueError("Line has an invalid endpoint index")
 
 
+def boxes(document: dict) -> list[dict]:
+    """Absolute footprint of every sticky, shape, text box and frame: centre plus size times scale."""
+    objects = document["data"]["objects"]
+    frames = {}
+    for index, obj in enumerate(objects):
+        fields = obj.get("widgetData", {}).get("json", {})
+        if obj.get("widgetData", {}).get("type") == "frame":
+            centre = fields["_position"]["offsetPx"]
+            width = fields.get("width") or fields["size"]["width"]
+            height = fields.get("height") or fields["size"]["height"]
+            frames[index] = (centre["x"] - width / 2, centre["y"] - height / 2, width, height)
+    result = []
+    for index, obj in enumerate(objects):
+        kind = obj.get("widgetData", {}).get("type")
+        fields = obj.get("widgetData", {}).get("json", {})
+        position = fields.get("_position")
+        size = fields.get("size")
+        if kind not in ("sticker", "shape", "text", "frame") or not isinstance(position, dict) or not size:
+            continue
+        x, y = position["offsetPx"]["x"], position["offsetPx"]["y"]
+        parent = (fields.get("_parent") or {}).get("index")
+        if position.get("schema") == "parentOffsetPx" and parent in frames:
+            x, y = x + frames[parent][0], y + frames[parent][1]
+        scale = (fields.get("scale") or {}).get("scale", 1) if kind != "frame" else 1
+        width, height = size["width"] * scale, size["height"] * scale
+        text = plain_text(fields.get("text") or "") if isinstance(fields.get("text"), str) else ""
+        result.append({"index": index, "type": kind, "left": x - width / 2, "top": y - height / 2,
+                       "right": x + width / 2, "bottom": y + height / 2, "parent": parent, "text": text})
+    return result
+
+
+def check(document: dict, against: dict = None) -> list[str]:
+    """Layout and completeness problems; an empty list means none found."""
+    problems = []
+    try:
+        compose_module.validate(document)
+    except ValueError as error:
+        problems.append(f"references: {error}")
+    items = boxes(document)
+    frames = {b["index"]: b for b in items if b["type"] == "frame"}
+    solid = [b for b in items if b["type"] != "frame"]
+    for i, a in enumerate(solid):
+        for b in solid[i + 1:]:
+            if a["left"] < b["right"] and b["left"] < a["right"] and a["top"] < b["bottom"] and b["top"] < a["bottom"]:
+                problems.append(f"overlap: object {a['index']} ({a['type']} {a['text'][:25]!r}) and "
+                                f"object {b['index']} ({b['type']} {b['text'][:25]!r})")
+    for b in solid:
+        frame = frames.get(b["parent"])
+        if frame and (b["left"] < frame["left"] or b["right"] > frame["right"]
+                      or b["top"] < frame["top"] or b["bottom"] > frame["bottom"]):
+            problems.append(f"outside frame: object {b['index']} ({b['type']} {b['text'][:25]!r})")
+    if against is not None:
+        have = {b["text"] for b in items}
+        for b in boxes(against):
+            if b["type"] == "sticker" and b["text"] and b["text"] not in have:
+                problems.append(f"missing from output: input sticky {b['index']} {b['text']!r}")
+    return problems
+
+
 def write_edited_capture(template_capture: Path, edited_json: Path, output: Path) -> None:
     document = json.loads(edited_json.read_text())
     validate_references(document)
@@ -132,6 +191,10 @@ def main() -> None:
                         help="Read an edited full JSON document and re-encode it")
     parser.add_argument("--write-capture", type=Path,
                         help="Write the re-encoded public.html capture here")
+    parser.add_argument("--check", action="store_true",
+                        help="Report overlapping objects, objects outside their frame and broken references")
+    parser.add_argument("--against", type=Path,
+                        help="With --check: also list stickies from this input capture whose exact text is missing")
     parser.add_argument("--compact", action="store_true",
                         help="Print one line per object instead of indented JSON")
     parser.add_argument("--subset", help="Comma-separated object indexes to keep, e.g. 0,3,5; "
@@ -164,6 +227,15 @@ def main() -> None:
         document = compose_module.decode_miro_json(compose_module.load_html_capture(args.capture))
     except (ValueError, KeyError, OSError) as error:
         raise SystemExit(f"error: {error}")
+    if args.check:
+        against = None
+        if args.against:
+            against = compose_module.decode_miro_json(compose_module.load_html_capture(args.against))
+        problems = check(document, against)
+        for problem in problems:
+            print(problem)
+        print(f"check: {len(problems)} problem(s)")
+        raise SystemExit(1 if problems else 0)
     rows = summary(document)
     if args.compact:
         print(f"{len(rows)} objects")

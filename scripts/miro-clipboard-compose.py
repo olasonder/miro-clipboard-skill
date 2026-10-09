@@ -20,12 +20,12 @@ from pathlib import Path
 
 MARKER = re.compile(r"\(miro-data-v1\)(.*?)\(/miro-data-v1\)")
 
-COMPOSABLE = {"sticker", "shape", "text", "line", "paint"}
+COMPOSABLE = {"sticker", "shape", "text", "line", "paint", "frame"}
 TYPE_ALIASES = {"sticky": "sticker", "note": "sticker", "sticky_note": "sticker", "connector": "line"}
 
 # Friendly scene keys mapped to keys inside each object's style string.
 STYLE_KEYS = {
-    "sticker": {"color": "sbc"},
+    "sticker": {"color": "sbc", "font_size": "fs"},
     "shape": {"color": "bc", "fill": "bc", "border_color": "brc", "border_width": "brw",
               "radius": "brr", "text_color": "tc", "font_size": "fs"},
     "text": {"color": "tc", "text_color": "tc", "background": "bc"},
@@ -40,6 +40,8 @@ ALLOWED_KEYS = {
     "shape": COMMON_KEYS | POSITIONED_KEYS | {"shape"},
     "text": COMMON_KEYS | POSITIONED_KEYS,
     "paint": COMMON_KEYS | {"x", "y", "points", "rotation", "scale"},
+    "frame": COMMON_KEYS | {"x", "y", "width", "height", "text", "contains"},
+    "group": {"type", "items"},
     "line": COMMON_KEYS | {"from", "to", "from_side", "to_side", "bend_points",
                            "x1", "y1", "x2", "y2", "caption", "arrow"},
 }
@@ -133,6 +135,8 @@ def apply_style(kind: str, fields: dict, spec: dict) -> None:
         raise ValueError("'style' must be an object of raw style keys")
     for style_key, value in raw.items():
         updates[style_key] = parse_color(value) if style_key in COLOR_KEYS and isinstance(value, str) else value
+    if kind == "sticker" and "font_size" in spec:
+        updates["fsa"] = 0  # fixed size; Miro's default (fs 0, fsa 1) fits the text automatically
     if updates:
         set_style(fields, **updates)
 
@@ -204,9 +208,15 @@ def check_spec(index: int, spec: object, count: int) -> str:
     if "type" not in spec:
         raise ValueError(f"Scene object {index} needs a 'type' (sticker, shape, text, line or paint)")
     kind = TYPE_ALIASES.get(spec["type"], spec["type"])
+    if kind == "group":
+        unknown = sorted(set(spec) - ALLOWED_KEYS["group"])
+        if unknown or not isinstance(spec.get("items"), list) or len(spec["items"]) < 2:
+            raise ValueError(f"Scene object {index}: a group needs only 'items', a list of two or more earlier indexes")
+        return kind
     if kind not in COMPOSABLE:
         raise ValueError(f"Scene object {index}: type {spec['type']!r} cannot be composed. Use sticker, shape, text, "
-                         "line or paint. For frames, grids, images or groups, edit decoded JSON (SKILL.md section 3).")
+                         "line, paint, frame or group. For grids, images or data tables, edit decoded JSON "
+                         "(SKILL.md section 3).")
     unknown = sorted(set(spec) - ALLOWED_KEYS[kind])
     if unknown:
         hints = "; ".join(f"'{key}': {HINTS.get((kind, key), 'not a ' + kind + ' field')}" for key in unknown)
@@ -222,8 +232,8 @@ def merge_templates(template: dict, extra: dict) -> dict:
     """Append another capture's composable objects to a template, so one scene can use both.
 
     Verified in Miro: a connector from a three-week-old capture, added to sticky notes
-    copied that day on the same board, pasted and stayed attached. Lines are detached;
-    groups and grid or frame relations are left out.
+    copied that day on the same board, pasted and stayed attached; a frame merged the
+    same way worked too. Lines are detached; groups and grid relations are left out.
     """
     merged = copy.deepcopy(template)
     objects = merged["data"]["objects"]
@@ -233,6 +243,8 @@ def merge_templates(template: dict, extra: dict) -> dict:
         if kind not in COMPOSABLE:
             continue
         clone = copy.deepcopy(obj)
+        if isinstance(clone["widgetData"]["json"].get("_parent"), dict):
+            clone["widgetData"]["json"]["_parent"] = None
         clone["id"] = len(objects)
         clone["initialId"] = str(next_id)
         next_id += 1000
@@ -243,6 +255,42 @@ def merge_templates(template: dict, extra: dict) -> dict:
         objects.append(clone)
     validate(merged)
     return merged
+
+
+def put_in_frame(document: dict, frame_index: int, members: "list[int] | None" = None) -> dict:
+    """Make objects children of a frame, as Miro stores them after you drag them into it.
+
+    A child gets `_parent: {"index": frame}` and a position relative to the frame's
+    top-left corner (`schema: "parentOffsetPx"`, `containerType: "FRAME"`); a frame's
+    own x, y is its centre. Lines get `_parent` only. Observed in a copy of a frame
+    whose children Miro had attached; see references/observed-format.md.
+    """
+    result = copy.deepcopy(document)
+    objects = result["data"]["objects"]
+    frame = objects[frame_index]
+    if frame.get("widgetData", {}).get("type") != "frame":
+        raise ValueError(f"Object {frame_index} is not a frame")
+    fields = frame["widgetData"]["json"]
+    centre = fields["_position"]["offsetPx"]
+    width = fields.get("width") or fields["size"]["width"]
+    height = fields.get("height") or fields["size"]["height"]
+    left, top = centre["x"] - width / 2, centre["y"] - height / 2
+    if members is None:
+        members = [i for i, obj in enumerate(objects) if i != frame_index and "widgetData" in obj]
+    for index in members:
+        obj = objects[index]
+        kind = obj.get("widgetData", {}).get("type")
+        if kind is None or kind == "frame":
+            raise ValueError(f"Object {index} cannot be put in a frame")
+        child = obj["widgetData"]["json"]
+        child["_parent"] = {"index": frame_index}
+        position = child.get("_position")
+        if isinstance(position, dict) and position.get("schema") == "canvasOffsetPx":
+            offset = position["offsetPx"]
+            child["_position"] = {"offsetPx": {"x": offset["x"] - left, "y": offset["y"] - top},
+                                  "schema": "parentOffsetPx", "containerType": "FRAME"}
+    validate(result)
+    return result
 
 
 def compose(template: dict, notes: list[dict]) -> dict:
@@ -264,8 +312,12 @@ def compose_mixed(template: dict, specs: list[dict], keep_template_ids: bool = F
     document = copy.deepcopy(template)
     objects = []
     used_ids = set()
+    frames = []
     for index, spec in enumerate(specs):
         kind = check_spec(index, spec, len(source_objects))
+        if kind == "group":
+            objects.append(make_group(index, spec, objects, source_objects, used_ids))
+            continue
         if "template_index" in spec:
             source = source_objects[spec["template_index"]]
             source_kind = source.get("widgetData", {}).get("type")
@@ -292,12 +344,26 @@ def compose_mixed(template: dict, specs: list[dict], keep_template_ids: bool = F
 
         if kind == "line":
             compose_line(index, spec, fields, objects, get_style(source["widgetData"]["json"]))
+        elif kind == "frame":
+            for key in ("x", "y", "width", "height"):
+                if not isinstance(spec.get(key), (int, float)) or isinstance(spec.get(key), bool):
+                    raise ValueError(f"Frame {index} needs numeric x, y (its centre), width and height")
+            fields["_position"] = {"offsetPx": {"x": spec["x"], "y": spec["y"]}, "schema": "canvasOffsetPx"}
+            fields["x"], fields["y"] = spec["x"], spec["y"]
+            fields["width"], fields["height"] = spec["width"], spec["height"]
+            fields["size"] = {"width": spec["width"], "height": spec["height"]}
+            fields["text"] = str(spec.get("text", "Frame"))  # frame titles are plain text, not HTML
+            fields["_parent"] = None
+            frames.append((index, spec.get("contains")))
         else:
             for key in ("x", "y"):
                 if not isinstance(spec.get(key), (int, float)) or isinstance(spec.get(key), bool):
                     raise ValueError(f"Scene object {index} ({kind}) needs numeric x and y")
             fields["_position"]["offsetPx"] = {"x": spec["x"], "y": spec["y"]}
             if kind in ("sticker", "shape", "text"):
+                if isinstance(fields.get("_position"), dict) and fields["_position"].get("schema") != "canvasOffsetPx":
+                    fields["_position"] = {"offsetPx": fields["_position"]["offsetPx"], "schema": "canvasOffsetPx"}
+                fields["_parent"] = None
                 if "text" in spec:
                     if not isinstance(spec["text"], str) or not spec["text"].strip():
                         raise ValueError(f"Scene object {index} needs nonempty text")
@@ -336,8 +402,40 @@ def compose_mixed(template: dict, specs: list[dict], keep_template_ids: bool = F
         apply_style(kind, fields, spec)
         objects.append(obj)
     document["data"]["objects"] = objects
+    for frame_index, contains in frames:
+        if contains is None:
+            continue
+        if contains == "all":
+            members = [i for i, o in enumerate(objects)
+                       if i > frame_index and o.get("widgetData", {}).get("type") not in (None, "frame")]
+        elif isinstance(contains, list) and all(isinstance(i, int) for i in contains):
+            members = contains
+        else:
+            raise ValueError(f"Frame {frame_index}: 'contains' must be \"all\" or a list of scene indexes")
+        for member in members:
+            if not frame_index < member < len(objects):
+                raise ValueError(f"Frame {frame_index}: put the frame before its contents in the scene "
+                                 f"(member {member} must come after it)")
+        document = put_in_frame(document, frame_index, members)
     validate(document)
     return document
+
+
+def make_group(index: int, spec: dict, objects: list, source_objects: list, used_ids: set) -> dict:
+    """A group record lists earlier objects; Miro moves them as one piece."""
+    items = spec["items"]
+    for item in items:
+        if not isinstance(item, int) or isinstance(item, bool) or not 0 <= item < index:
+            raise ValueError(f"Group {index}: items must be indexes of earlier objects in the scene")
+        if "widgetData" not in objects[item]:
+            raise ValueError(f"Group {index}: nested groups are not supported")
+    copied = [obj for obj in source_objects if obj.get("type") == 10 and "widgetData" not in obj]
+    meta = copy.deepcopy(copied[0].get("meta", {}) if copied else objects[items[0]].get("meta", {}))
+    initial_id = int(objects[items[-1]]["initialId"]) + 1
+    while str(initial_id) in used_ids:
+        initial_id += 1
+    used_ids.add(str(initial_id))
+    return {"type": 10, "items": list(items), "id": index, "initialId": str(initial_id), "meta": meta}
 
 
 def compose_line(index: int, spec: dict, fields: dict, objects: list, template_style: dict) -> None:
@@ -412,31 +510,58 @@ def write_capture(source_html: str, document: dict, output: Path) -> None:
     os.chmod(output, 0o600)
 
 
+def describe_template(index: int, obj: dict) -> str:
+    kind = obj.get("widgetData", {}).get("type", "group")
+    fields = obj.get("widgetData", {}).get("json", {})
+    parts = [str(index), kind]
+    if kind == "group":
+        parts.append(f"items={obj.get('items')}")
+    style = get_style(fields)
+    if "shape" in fields:
+        name = {v: k for k, v in SHAPE_CODES.items() if k in ("rectangle", "ellipse", "triangle", "rhombus")}
+        parts.append(f"shape={name.get(fields['shape'], fields['shape'])}")
+    size = fields.get("size")
+    if isinstance(size, dict):
+        scale = (fields.get("scale") or {}).get("scale", 1)
+        parts.append(f"size={size.get('width')}x{size.get('height')}" + (f"*{scale:.4g}" if scale != 1 else ""))
+    for key in ("sbc", "bc", "lc"):
+        if isinstance(style.get(key), int) and style[key] >= 0:
+            parts.append("color=#%06X" % style[key])
+            break
+    if kind == "line":
+        captions = (fields.get("line") or {}).get("captions") or []
+        parts.append("label=" + (re.sub(r"<[^>]+>", "", captions[0].get("text", "")) if captions else "none"))
+    text = re.sub(r"<[^>]+>", " ", str(fields.get("text") or "")).strip()
+    if text:
+        parts.append(repr(text[:40]))
+    return "\t".join(parts)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("template", type=Path, help="Capture of copied Miro template objects")
-    parser.add_argument("scene", type=Path, help="JSON file with a notes or objects array")
-    parser.add_argument("output", type=Path, help="Destination capture JSON")
+    parser.add_argument("scene", type=Path, nargs="?", help="JSON file with a notes or objects array")
+    parser.add_argument("output", type=Path, nargs="?", help="Destination capture JSON")
     parser.add_argument("--add-template", type=Path, action="append", default=[],
                         help="Another capture whose stickies, shapes, text, lines and pen strokes are added as extra "
                              "templates after the main template's objects. Use --show-templates to see their indexes")
     parser.add_argument("--show-templates", action="store_true",
                         help="Print the combined template objects with their indexes and stop")
     args = parser.parse_args()
+    if not args.show_templates and (args.scene is None or args.output is None):
+        parser.error("scene and output are required unless you use --show-templates")
     try:
-        scene = json.loads(args.scene.read_text())
-        if not isinstance(scene, dict) or not ({"objects", "notes"} & set(scene)):
-            raise ValueError("The scene must be a JSON object with an 'objects' or a 'notes' list")
         source_html = load_html_capture(args.template)
         template = decode_miro_json(source_html)
         for extra in args.add_template:
             template = merge_templates(template, decode_miro_json(load_html_capture(extra)))
         if args.show_templates:
             for index, obj in enumerate(template["data"]["objects"]):
-                kind = obj.get("widgetData", {}).get("type", "group")
-                text = re.sub(r"<[^>]+>", " ", str(obj.get("widgetData", {}).get("json", {}).get("text") or "")).strip()
-                print(f"{index}\t{kind}\t{text[:40]}")
+                print(describe_template(index, obj))
             return
+        scene = json.loads(args.scene.read_text())
+        if not isinstance(scene, dict) or not ({"objects", "notes"} & set(scene)):
+            raise ValueError("The scene must be a JSON object with an 'objects' or a 'notes' list")
         if "objects" in scene:
             specs = scene["objects"]
             document = compose_mixed(template, specs)

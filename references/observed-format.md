@@ -124,7 +124,7 @@ The copied stickies had `size` 199 x 228 and `scale` 0.43, so they occupied abou
 | Style key | Observed | Meaning | Status |
 |---|---|---|---|
 | `sbc` | 16775070 | background colour | paste confirmed |
-| `fs`, `fsa` | 0, 1 | font size, auto-size on (assumed) | observed only |
+| `fs`, `fsa` | 0, 1 | font size and auto-fit. Default `fs 0, fsa 1` fits the text, so short notes get very large letters. `fsa 0` with `fs 14` or `fs 24` gave every note the same size; a long note still fitted at 24 | paste confirmed |
 | `ffn` | "Noto Sans" | font family | observed only |
 | `ta`, `tav` | "c", "m" | horizontal and vertical text alignment | observed only |
 | `taw`, `tah` | 0, 0 | unknown | observed only |
@@ -183,6 +183,7 @@ Each endpoint looks like:
 - **Sides.** `x: 0.5, y: 1` is the middle of the bottom, `x: 0.5, y: 0` the middle of the top. A connector from the bottom of a diamond to the top of a box pasted as intended (paste confirmed).
 - **Connectors between sticky notes** stayed attached and curved along when a note was moved (paste confirmed). Connectors to text boxes or frames have not been verified; the composer warns.
 - **No label.** Setting `line.captions` to `[]` on a clone of a labelled line removed the label (paste confirmed).
+- **Several labels.** Four connectors cloned from one labelled template share the caption's internal id; all four showed their own label (paste confirmed).
 
 | Style key | Observed | Meaning | Status |
 |---|---|---|---|
@@ -201,7 +202,16 @@ A pen stroke, not a connector. Fields: `_position.offsetPx`, `points` (a list of
 
 ## Frame, `widgetData.type: "frame"`
 
-Fields: plain-text `text` (the title), `x`, `y`, `width`, `height`, `_position.offsetPx`, `size`, transform fields, `style` (`fs`, `tc`, `ta`, `ff`, `ss`, `sc`, `bc`, `fo`, `fd`), `boardId`, `prevFrameIndex`, `isClusteringContainer`. Position and size appear twice; change both. A renamed and resized frame pasted (paste confirmed). Whether objects pasted with a frame become its children has not been tested.
+Fields: plain-text `text` (the title), `x`, `y`, `width`, `height`, `_position.offsetPx`, `size`, transform fields, `style` (`fs`, `tc`, `ta`, `ff`, `ss`, `sc`, `bc`, `fo`, `fd`), `boardId`, `prevFrameIndex`, `isClusteringContainer`, `type: 12`, `coldStartType`, `speakerNotes`. `x, y` is the centre, and position and size appear twice; change both. A renamed and resized frame pasted (paste confirmed).
+
+**Children.** Objects placed on top of a frame are **not** its children unless the data says so: they stayed behind when the frame was dragged (paste confirmed). A copy of a frame with children showed how Miro stores the link, and generating it the same way worked: 63 objects moved with their frame (paste confirmed). Each child has:
+
+```json
+"_parent": {"index": 0},
+"_position": {"offsetPx": {"x": 140, "y": 270}, "schema": "parentOffsetPx", "containerType": "FRAME"}
+```
+
+`index` is the frame's array index, and `offsetPx` is the child's centre measured from the frame's **top-left corner** (frame centre minus half its width and height). Lines in the frame get `_parent` only; their `_position` stays `null`. In the copy the frame came first in the array, which also keeps it behind its contents. The composer's `contains` field and `put_in_frame()` do this.
 
 ## Grid and cells, `grid` plus `grid_text`
 
@@ -217,7 +227,7 @@ Holds position, scale, crop, title, alt text, a border style and a `resource` ob
 
 ## Group, object `type: 10`
 
-No `widgetData`; `items` lists member indexes, and the group record comes after its members. A generated group of two shapes and a connector pasted and moved together (paste confirmed). Editing a child and ungrouping have not been tested.
+No `widgetData`; `items` lists member indexes, and the group record comes after its members. It has `id`, `initialId` and `meta` like other objects. Generated groups of two shapes and a connector, and of five stickies and a text box, pasted and moved as one piece (paste confirmed). Editing a child and ungrouping have not been tested.
 
 ## Reusing captures
 

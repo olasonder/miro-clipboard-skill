@@ -36,6 +36,8 @@ TEMPLATE = {"isProtected": False, "boardId": "synthetic", "version": 2, "host": 
         "secondary": {"point": {"x": 0, "y": 0.5}, "positionType": 0, "widgetIndex": 0},
         "style": json.dumps({"lc": 3355443, "t": 2, "a_end": 9})}}},
     {"type": 10, "id": 3, "initialId": "1030", "items": [0, 1, 2]},
+    obj(4, "frame", text="Frame", x=0, y=0, width=100, height=100, size={"width": 100, "height": 100},
+        style=json.dumps({"fs": 14, "bc": 16777215})),
 ]}}
 
 
@@ -98,7 +100,28 @@ def main() -> None:
     expect_error([{"type": "sticker", "x": 0, "y": 0, "text": "x", "fill": "#FFFFFF"}], "use 'color'")
     expect_error([{"type": "sticker", "x": 0, "y": 0, "text": "x", "colour": "#FFFFFF"}], "unknown field")
     expect_error([{"type": "sticker", "x": 0, "y": 0}], "needs 'text'")
-    expect_error([{"type": "frame", "x": 0, "y": 0}], "cannot be composed")
+    expect_error([{"type": "image", "x": 0, "y": 0}], "cannot be composed")
+    expect_error([{"type": "shape", "x": 0, "y": 0, "text": "a"},
+                  {"type": "frame", "x": 0, "y": 0, "width": 10, "height": 10, "contains": [0]}], "before its contents")
+    expect_error([{"type": "shape", "x": 0, "y": 0, "text": "a"}, {"type": "group", "items": [0, 5]}], "earlier")
+
+    board = compose.compose_mixed(TEMPLATE, [
+        {"type": "frame", "x": 500, "y": 400, "width": 1000, "height": 800, "text": "Synthesis", "contains": "all"},
+        {"type": "sticker", "x": 200, "y": 200, "text": "a", "font_size": 24},
+        {"type": "sticker", "x": 500, "y": 200, "text": "b"},
+        {"type": "line", "from": 1, "to": 2},
+        {"type": "group", "items": [1, 2]}])
+    objs = board["data"]["objects"]
+    frame = objs[0]["widgetData"]["json"]
+    assert frame["text"] == "Synthesis" and frame["width"] == 1000 and frame["size"]["height"] == 800
+    child = objs[1]["widgetData"]["json"]
+    assert child["_parent"] == {"index": 0}
+    assert child["_position"] == {"offsetPx": {"x": 200, "y": 200}, "schema": "parentOffsetPx",
+                                  "containerType": "FRAME"}, child["_position"]
+    assert objs[3]["widgetData"]["json"]["_parent"] == {"index": 0}, "lines join the frame"
+    assert objs[4]["type"] == 10 and objs[4]["items"] == [1, 2] and "_parent" not in objs[4]
+    assert json.loads(child["style"])["fs"] == 24 and json.loads(child["style"])["fsa"] == 0
+    assert json.loads(objs[2]["widgetData"]["json"]["style"])["fsa"] == 1, "default stays automatic"
     expect_error([{"x": 0, "y": 0}], "needs a 'type'")
     expect_error([{"type": "sticker", "template_index": 99, "x": 0, "y": 0}], "template_index")
     expect_error([{"type": "sticker", "template_index": -1, "x": 0, "y": 0}], "template_index")
@@ -107,11 +130,11 @@ def main() -> None:
     expect_error([{"type": "line", "from": 0, "to": 0}], "earlier objects")
 
     merged = compose.merge_templates(TEMPLATE, TEMPLATE)
-    assert len(merged["data"]["objects"]) == 7, "group record is not merged"
-    assert merged["data"]["objects"][6]["widgetData"]["json"]["primary"]["widgetIndex"] == -1, "merged line detached"
-    joined = compose.compose_mixed(merged, [{"type": "shape", "template_index": 5, "x": 0, "y": 0, "text": "S"},
+    assert len(merged["data"]["objects"]) == 9, "group record is not merged"
+    assert merged["data"]["objects"][7]["widgetData"]["json"]["primary"]["widgetIndex"] == -1, "merged line detached"
+    joined = compose.compose_mixed(merged, [{"type": "shape", "template_index": 6, "x": 0, "y": 0, "text": "S"},
                                             {"type": "shape", "template_index": 1, "x": 200, "y": 0, "text": "T"},
-                                            {"type": "line", "template_index": 6, "from": 0, "to": 1}])
+                                            {"type": "line", "template_index": 7, "from": 0, "to": 1}])
     assert joined["data"]["objects"][2]["widgetData"]["json"]["secondary"]["widgetIndex"] == 1
 
     part = compose.subset(TEMPLATE, [1, 0, 2, 3])
@@ -142,6 +165,17 @@ def main() -> None:
         result = run(template_capture, "--compact")
         assert result.returncode == 0 and '"caption":"x"' in result.stdout and "#FFF79E" in result.stdout, result.stderr
         assert run(template_capture, "--subset", "0,1,2,3", "--write-capture", folder / "sub.json").returncode == 0
+        framed = folder / "framed.json"
+        compose.write_capture(html_text, board, framed)
+        assert run(framed, "--check").returncode == 0, run(framed, "--check").stdout
+        crowded = compose.compose_mixed(TEMPLATE, [{"type": "sticker", "x": 0, "y": 0, "text": "a"},
+                                                   {"type": "sticker", "x": 10, "y": 10, "text": "b"}])
+        compose.write_capture(html_text, crowded, folder / "crowded.json")
+        result = run(folder / "crowded.json", "--check", "--against", template_capture)
+        assert result.returncode == 1 and "overlap" in result.stdout and "missing from output" in result.stdout, result.stdout
+        composer = [sys.executable, str(HERE / "miro-clipboard-compose.py")]
+        listing = subprocess.run(composer + [str(template_capture), "--show-templates"], capture_output=True, text=True)
+        assert listing.returncode == 0 and "label=x" in listing.stdout and "color=#FFF79E" in listing.stdout, listing
         assert run(template_capture, "--subset", "0,0", "--write-capture", folder / "bad.json").returncode != 0
         assert run(template_capture, "--decode-to", folder / "decoded.json").returncode == 0
         decoded = json.loads((folder / "decoded.json").read_text())
@@ -149,7 +183,7 @@ def main() -> None:
         (folder / "edited.json").write_text(json.dumps(decoded))
         result = run(template_capture, "--encode-from", folder / "edited.json", "--write-capture", folder / "e.json")
         assert result.returncode != 0 and "initialId" in result.stderr, "duplicate initialId rejected"
-    print("selftest passed: encoding, colours, text, shapes, connectors, labels, arrows, field checks, subset, reader")
+    print("selftest passed: encoding, colours, text, shapes, connectors, labels, arrows, frames, groups, font size, field checks, subset, reader")
 
 
 if __name__ == "__main__":

@@ -24,6 +24,8 @@ These were generated from captured samples and pasted successfully: Unicode and 
 
 Done on 9 October 2026: the sticky palette, connectors between stickies, top and bottom connector sides, removing a template label, sticky `scale` versus `size`, newlines in a sticky, and reuse of a three-week-old capture on the same board (see `evidence.md`, item 12).
 
+Done the same day: frame children, groups of stickies, fixed sticky text size, four labels from one template (`evidence.md`, item 13).
+
 - Connector between a sticky and a shape, and to a text box. Move both ends.
 - Very long text in a sticky.
 - Paste a generated capture on a different board, and in another Miro organisation.
@@ -36,7 +38,6 @@ Done on 9 October 2026: the sticky palette, connectors between stickies, top and
 
 **Later, as needed**
 
-- Objects inside a frame: copy frame plus child and inspect `_parent`; then generate the relationship and move the frame.
 - Group child edits, ungrouping, nested groups.
 - Grid rows and columns, merges and cell formatting.
 - Images and data tables on another board and account.
