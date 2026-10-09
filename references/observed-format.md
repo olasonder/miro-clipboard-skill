@@ -86,7 +86,7 @@ Most objects in `data.objects` have `type: 14`, a zero-based `id`, a numeric-str
 | Frame title | `tc` | 6052956 | `#5C5C5C` | copied |
 | Frame fill | `bc` | 16777215 | `#FFFFFF` | copied |
 
-Miro's sticky colour palette (the swatches in its colour picker) has **not** been captured yet, and it is not known whether Miro snaps an arbitrary colour to the nearest swatch. Arbitrary hex values pasted as that colour in the tests above. To add a palette, copy one sticky of each swatch on a test board, capture, and read the `sbc` values with `miro-clipboard-read.py` (the summary shows each object's colour).
+Miro's sticky colour palette (the swatches in its colour picker) has **not** been captured yet. Two custom colours pasted as given (the pale green sticky and the blue and red shape above); other values are untested, and it is not known whether Miro adjusts a colour to its nearest swatch. To add a palette, copy one sticky of each swatch on a test board, capture, and read the `sbc` values with `miro-clipboard-read.py` (the summary shows each object's colour).
 
 ## Sticky note, `widgetData.type: "sticker"`
 
@@ -103,7 +103,7 @@ The copied sticky had `size` 199 x 228 and `scale` 0.43, so it occupied about 86
 | `taw`, `tah` | 0, 0 | unknown | observed only |
 | `lh` | 1.36 | line height | observed only |
 
-Keep `ns:author` when cloning. Changing text length, Unicode, emoji and `&` all pasted as editable stickies. Newlines as separate `<p>` paragraphs have not been paste-tested.
+Keep `ns:author` when cloning. Clones therefore carry the template's author; whether Miro shows that person as the author of the new notes has not been checked. Changing text length, Unicode, emoji and `&` all pasted as editable stickies. Newlines as separate `<p>` paragraphs have not been paste-tested.
 
 ## Shape, `widgetData.type: "shape"`
 

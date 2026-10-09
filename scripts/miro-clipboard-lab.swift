@@ -50,7 +50,7 @@ func describe(_ capture: Capture) {
 }
 
 func usage() -> Never {
-    fputs("Usage:\n  swift miro-clipboard-lab.swift inspect\n  swift miro-clipboard-lab.swift show-html\n  swift miro-clipboard-lab.swift capture /path/sample.json\n  swift miro-clipboard-lab.swift replay /path/sample.json [--drop-type TYPE | --only-type TYPE] [--strip-miro-meta] [--replace-visible OLD NEW] [--set-meta-byte OFFSET VALUE | --replace-native-text OLD NEW]\n  swift miro-clipboard-lab.swift selftest\n", stderr)
+    fputs("Usage:\n  swift miro-clipboard-lab.swift inspect\n  swift miro-clipboard-lab.swift show-html\n  swift miro-clipboard-lab.swift capture /path/sample.json [--any]\n  swift miro-clipboard-lab.swift replay /path/sample.json [--drop-type TYPE | --only-type TYPE] [--strip-miro-meta] [--replace-visible OLD NEW] [--set-meta-byte OFFSET VALUE | --replace-native-text OLD NEW]\n  swift miro-clipboard-lab.swift selftest\n", stderr)
     exit(2)
 }
 
@@ -116,10 +116,21 @@ case "show-html":
     print(value)
 
 case "capture":
-    guard args.count == 2 else { usage() }
+    guard args.count == 2 || (args.count == 3 && args[2] == "--any") else { usage() }
     let capture = read(.general)
     guard !capture.items.isEmpty else {
-        fputs("No clipboard items visible; nothing saved.\n", stderr)
+        fputs("No clipboard items visible; nothing saved. If the user did copy in Miro, this process probably cannot reach the clipboard (for example a sandbox).\n", stderr)
+        exit(1)
+    }
+    // Refuse anything that is not a Miro copy, so a password or other private text is never saved by mistake.
+    let isMiro = capture.items.contains { item in
+        item.representations.contains { rep in
+            rep.type == NSPasteboard.PasteboardType.html.rawValue &&
+                (String(data: rep.data, encoding: .utf8)?.contains("(miro-data-v1)") ?? false)
+        }
+    }
+    guard isMiro || args.count == 3 else {
+        fputs("The clipboard does not hold a Miro copy; nothing saved. Select objects in Miro, press Cmd-C, and try again.\n", stderr)
         exit(1)
     }
     let url = URL(fileURLWithPath: args[1])

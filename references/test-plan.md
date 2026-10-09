@@ -5,10 +5,10 @@ Use this when you extend the skill, when Miro changes, or when you need a behavi
 ## Run a check
 
 1. Copy the objects you need as templates in Miro and capture them:
-   `swift scripts/miro-clipboard-lab.swift capture /tmp/template.json`
+   `swift scripts/miro-clipboard-lab.swift capture ~/miro-captures/template.json` (create the folder with `mkdir -m 700 -p ~/miro-captures`)
 2. Generate the case with the composer, or by editing decoded JSON (see [observed-format.md](observed-format.md)).
 3. Run `python3 scripts/selftest.py` after changing any script. It needs no Miro and no clipboard.
-4. Replay and paste: `swift scripts/miro-clipboard-lab.swift replay /tmp/case.json`, then paste in an empty area.
+4. Replay and paste: `swift scripts/miro-clipboard-lab.swift replay ~/miro-captures/case.json`, then paste in an empty area.
 5. Check appearance **and** behaviour. For a connector, move its endpoint objects. For a group, move it and edit a child. For text, edit it. When it matters, reload the board and check again.
 6. Record `pass`, `partial` or `fail` with what actually happened, and update `evidence.md`.
 
@@ -24,6 +24,8 @@ These were generated from captured samples and pasted successfully: Unicode and 
 
 - Sticky palette: copy one sticky of every swatch in Miro's colour picker, capture, and record each `sbc` value in `observed-format.md`.
 - Connector between two stickies, and between a sticky and a shape. Move both ends.
+- Connector sides `top` and `bottom`, and a line without a label cloned from a labelled template (the composer empties `line.captions`).
+- Sticky `scale` versus `size`: which one makes a note bigger.
 - Newlines in a sticky (two `<p>` paragraphs) and very long text.
 - Paste the same generated capture on a second board, and after reloading Miro.
 

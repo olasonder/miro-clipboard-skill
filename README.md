@@ -34,7 +34,16 @@ git clone https://github.com/olasonder/miro-clipboard-skill ~/.claude/skills/mir
 git clone https://github.com/olasonder/miro-clipboard-skill ~/.codex/skills/miro-clipboard
 ```
 
-Requirements: macOS, Python 3 and Swift (included with the Xcode Command Line Tools).
+Check that it works, then start a new Claude Code or Codex session so the skill loads:
+
+```sh
+cd ~/.claude/skills/miro-clipboard   # or ~/.codex/skills/miro-clipboard
+python3 scripts/selftest.py && swift scripts/miro-clipboard-lab.swift selftest
+```
+
+Update later with `git -C ~/.claude/skills/miro-clipboard pull`.
+
+Requirements: macOS, Python 3.9 or newer, and Swift. If `swift` is missing, run `xcode-select --install`. The folder must be called `miro-clipboard`, which the commands above do for you.
 
 ## How it works
 

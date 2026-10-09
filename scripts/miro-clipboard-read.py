@@ -38,6 +38,9 @@ def summary(document: dict) -> list[dict]:
                 row["grid_cell"] = {"row": position.get("row"), "column": position.get("column")}
         if "size" in fields:
             row["size"] = fields["size"]
+        scale = fields.get("scale")
+        if isinstance(scale, dict) and isinstance(scale.get("scale"), (int, float)) and scale["scale"] != 1:
+            row["scale"] = round(scale["scale"], 4)
         for key in ("text", "html"):
             if isinstance(fields.get(key), str) and fields[key]:
                 row["text"] = plain_text(fields[key])
@@ -53,12 +56,18 @@ def summary(document: dict) -> list[dict]:
                 if isinstance(style.get(key), int) and style[key] >= 0:
                     row["color"] = "#%06X" % style[key]
                     break
+            if widget["type"] == "text" and isinstance(style.get("tc"), int) and style["tc"] >= 0:
+                row["text_color"] = "#%06X" % style["tc"]
         if "shape" in fields:
             row["shape_code"] = fields["shape"]
         if widget["type"] == "line":
             row["from"] = fields["primary"]["widgetIndex"]
             row["to"] = fields["secondary"]["widgetIndex"]
             row["bend_points"] = len(fields.get("points", []))
+            captions = (fields.get("line") or {}).get("captions") or []
+            labels = [plain_text(c.get("text", "")) for c in captions if c.get("text")]
+            if labels:
+                row["caption"] = " / ".join(labels)
         if widget["type"] == "paint":
             row["points"] = len(fields.get("points", []))
         if widget["type"] == "image":
@@ -94,6 +103,7 @@ def validate_references(document: dict) -> None:
 def write_edited_capture(template_capture: Path, edited_json: Path, output: Path) -> None:
     document = json.loads(edited_json.read_text())
     validate_references(document)
+    compose_module.validate(document)
     template_html = compose_module.load_html_capture(template_capture)
     native_html = compose_module.encode_miro_json(template_html, document)
     if compose_module.decode_miro_json(native_html) != document:
@@ -122,27 +132,45 @@ def main() -> None:
                         help="Read an edited full JSON document and re-encode it")
     parser.add_argument("--write-capture", type=Path,
                         help="Write the re-encoded public.html capture here")
+    parser.add_argument("--compact", action="store_true",
+                        help="Print one line per object instead of indented JSON")
     parser.add_argument("--subset", help="Comma-separated object indexes to keep, e.g. 0,3,5; "
                         "references are rebased. Use with --write-capture to make a template")
     args = parser.parse_args()
     if args.subset:
         if not args.write_capture:
             parser.error("--subset needs --write-capture")
+        if args.decode_to or args.encode_from:
+            parser.error("--subset cannot be combined with --decode-to or --encode-from")
         source_html = compose_module.load_html_capture(args.capture)
         document = compose_module.decode_miro_json(source_html)
-        indexes = [int(part) for part in args.subset.split(",") if part.strip()]
-        compose_module.write_capture(source_html, compose_module.subset(document, indexes), args.write_capture)
+        try:
+            indexes = [int(part) for part in args.subset.split(",") if part.strip()]
+            compose_module.write_capture(source_html, compose_module.subset(document, indexes), args.write_capture)
+        except ValueError as error:
+            raise SystemExit(f"error: {error}")
         print(f"Subset of {len(indexes)} objects saved locally: {args.write_capture}")
         return
     if bool(args.encode_from) != bool(args.write_capture):
         parser.error("--encode-from and --write-capture must be used together")
     if args.encode_from:
-        write_edited_capture(args.capture, args.encode_from, args.write_capture)
+        try:
+            write_edited_capture(args.capture, args.encode_from, args.write_capture)
+        except (ValueError, KeyError) as error:
+            raise SystemExit(f"error: {error}")
         print(f"Edited capture saved locally: {args.write_capture}")
         return
-    document = compose_module.decode_miro_json(compose_module.load_html_capture(args.capture))
+    try:
+        document = compose_module.decode_miro_json(compose_module.load_html_capture(args.capture))
+    except (ValueError, KeyError, OSError) as error:
+        raise SystemExit(f"error: {error}")
     rows = summary(document)
-    print(json.dumps({"objects": len(rows), "summary": rows}, ensure_ascii=False, indent=2))
+    if args.compact:
+        print(f"{len(rows)} objects")
+        for row in rows:
+            print(json.dumps(row, ensure_ascii=False, separators=(",", ":")))
+    else:
+        print(json.dumps({"objects": len(rows), "summary": rows}, ensure_ascii=False, indent=2))
     if args.decode_to:
         args.decode_to.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n")
         os.chmod(args.decode_to, 0o600)
