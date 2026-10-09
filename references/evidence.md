@@ -16,6 +16,14 @@ Observed with disposable Miro boards and invented content, in Chrome on macOS, S
 10. Generated test cases pasted visibly: Unicode and emoji text, a pale-green sticky, six shape variants, a pale-blue shape with a thick red rounded border, a rotated shape, a two-paragraph text box, three line styles and an edited caption, a connector with a bend point, a calculated wave and zigzag, a resized and renamed frame, a 2 x 2 grid, a data-table view, a dummy image, a group of shapes with a connector, and 25 numbered stickies.
 11. Follow-up checks: the generated group moves together, the grid shows its content but renders small, the connector bend stays correct after moving a shape, and the data table pasted empty because the source table was empty too.
 
+12. **9 October 2026**, after the composer was extended:
+    - a flowchart built from a three-week-old capture (pasted on the same board): a diamond made with the new `shape` field, connectors labelled "yes" and "no", one connector with **no** label although its template had one, and a branch from the bottom of the diamond to the top of a box;
+    - sixteen stickies in every colour of Miro's picker, each with its number; Miro showed white text on the black one;
+    - a sticky with two lines;
+    - a sticky made twice as big with `scale` (worked) and one with doubled `size` (became wide and rectangular instead);
+    - two stickies at the same `y` but different sizes had level centres, so `x, y` is the centre;
+    - three pink stickies joined by connectors, using a connector merged in from the three-week-old capture; the connectors stayed attached and curved along when the middle sticky was moved.
+
 A visual pass means the objects appeared. Behaviour (editing, moving, persistence after reload) is confirmed only where stated.
 
 ## Confirmed by local checks only
@@ -27,10 +35,9 @@ A visual pass means the objects appeared. Behaviour (editing, moving, persistenc
 
 ## Still open
 
-- Connectors attached to stickies, text boxes, frames or groups.
+- Connectors attached to text boxes, frames or groups.
 - The meaning of individual line style values (`ls`, `lt`) and of several shape and sticky style keys; each was changed only together with others, or not at all.
-- Miro's sticky colour palette, and whether arbitrary colours are snapped to it.
-- Newlines and rich text inside stickies.
-- Pasting on another board, in another organisation, after a browser restart, or on another day. Resource-based objects (images, data tables) are the most likely to fail there.
+- Rich text (bold, lists, links) inside stickies.
+- Pasting on another board or in another organisation. Reuse three weeks later on the same board worked for stickies, shapes and connectors; resource-based objects (images, data tables) are the most likely to fail elsewhere.
 - Child edits and ungrouping for generated groups; objects becoming frame children.
 - Behaviour in browsers other than Chrome, and in future Miro versions.

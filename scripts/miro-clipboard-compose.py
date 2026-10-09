@@ -54,7 +54,7 @@ SHAPE_CODES = {"rectangle": "3", "square": "3", "ellipse": "4", "circle": "4", "
 SIDES = {"left": {"x": 0, "y": 0.5}, "right": {"x": 1, "y": 0.5},
          "top": {"x": 0.5, "y": 0}, "bottom": {"x": 0.5, "y": 1}}
 ARROWS = {"end", "start", "both", "none"}
-VERIFIED_LINE_TARGETS = {"shape"}
+VERIFIED_LINE_TARGETS = {"shape", "sticker"}
 
 
 def warn(message: str) -> None:
@@ -218,6 +218,33 @@ def check_spec(index: int, spec: object, count: int) -> str:
     return kind
 
 
+def merge_templates(template: dict, extra: dict) -> dict:
+    """Append another capture's composable objects to a template, so one scene can use both.
+
+    Verified in Miro: a connector from a three-week-old capture, added to sticky notes
+    copied that day on the same board, pasted and stayed attached. Lines are detached;
+    groups and grid or frame relations are left out.
+    """
+    merged = copy.deepcopy(template)
+    objects = merged["data"]["objects"]
+    next_id = max(int(obj["initialId"]) for obj in objects) + 1000
+    for obj in extra["data"]["objects"]:
+        kind = obj.get("widgetData", {}).get("type")
+        if kind not in COMPOSABLE:
+            continue
+        clone = copy.deepcopy(obj)
+        clone["id"] = len(objects)
+        clone["initialId"] = str(next_id)
+        next_id += 1000
+        fields = clone["widgetData"]["json"]
+        if kind == "line":
+            for endpoint in ("primary", "secondary"):
+                fields[endpoint]["widgetIndex"] = -1
+        objects.append(clone)
+    validate(merged)
+    return merged
+
+
 def compose(template: dict, notes: list[dict]) -> dict:
     """Clone the first copied sticky note into several notes."""
     if not isinstance(notes, list):
@@ -289,8 +316,8 @@ def compose_mixed(template: dict, specs: list[dict], keep_template_ids: bool = F
             if "size" not in fields:
                 raise ValueError(f"{kind} has no size field")
             if kind == "sticker":
-                warn(f"object {index}: changing a sticky's width/height is untested; Miro may ignore it. "
-                     "See the resize recipe in SKILL.md.")
+                warn(f"object {index}: a sticky's width/height changes its shape (doubling both gave a wide, "
+                     "rectangular note), not its size. To make a sticky bigger, use 'scale'.")
             for dimension in ("width", "height"):
                 if dimension in spec:
                     fields["size"][dimension] = spec[dimension]
@@ -299,7 +326,8 @@ def compose_mixed(template: dict, specs: list[dict], keep_template_ids: bool = F
                 raise ValueError(f"Scene object {index}: scale must be a positive number")
             fields["scale"] = {"scale": spec["scale"]}
             fields["relativeScale"] = spec["scale"]
-            warn(f"object {index}: setting scale is untested; check the size after pasting")
+            if kind != "sticker":
+                warn(f"object {index}: scale is verified for sticky notes only; check the size after pasting")
         if "rotation" in spec:
             fields["rotation"] = {"rotation": spec["rotation"]}
             fields["relativeRotation"] = spec["rotation"]
@@ -322,8 +350,8 @@ def compose_line(index: int, spec: dict, fields: dict, objects: list, template_s
                 raise ValueError(f"Line {index} cannot attach to another line")
         unverified = sorted({objects[end]["widgetData"]["type"] for end in ends} - VERIFIED_LINE_TARGETS)
         if unverified:
-            warn(f"line {index} attaches to {', '.join(unverified)}; only shape-to-shape connectors have been "
-                 "verified in Miro. Check the paste.")
+            warn(f"line {index} attaches to {', '.join(unverified)}; only connectors between shapes and "
+                 "sticky notes have been verified in Miro. Check the paste.")
         sides = []
         for key, default in (("from_side", "right"), ("to_side", "left")):
             side = spec.get(key, default)
@@ -389,6 +417,11 @@ def main() -> None:
     parser.add_argument("template", type=Path, help="Capture of copied Miro template objects")
     parser.add_argument("scene", type=Path, help="JSON file with a notes or objects array")
     parser.add_argument("output", type=Path, help="Destination capture JSON")
+    parser.add_argument("--add-template", type=Path, action="append", default=[],
+                        help="Another capture whose stickies, shapes, text, lines and pen strokes are added as extra "
+                             "templates after the main template's objects. Use --show-templates to see their indexes")
+    parser.add_argument("--show-templates", action="store_true",
+                        help="Print the combined template objects with their indexes and stop")
     args = parser.parse_args()
     try:
         scene = json.loads(args.scene.read_text())
@@ -396,6 +429,14 @@ def main() -> None:
             raise ValueError("The scene must be a JSON object with an 'objects' or a 'notes' list")
         source_html = load_html_capture(args.template)
         template = decode_miro_json(source_html)
+        for extra in args.add_template:
+            template = merge_templates(template, decode_miro_json(load_html_capture(extra)))
+        if args.show_templates:
+            for index, obj in enumerate(template["data"]["objects"]):
+                kind = obj.get("widgetData", {}).get("type", "group")
+                text = re.sub(r"<[^>]+>", " ", str(obj.get("widgetData", {}).get("json", {}).get("text") or "")).strip()
+                print(f"{index}\t{kind}\t{text[:40]}")
+            return
         if "objects" in scene:
             specs = scene["objects"]
             document = compose_mixed(template, specs)

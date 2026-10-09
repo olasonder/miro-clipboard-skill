@@ -74,7 +74,7 @@ def main() -> None:
             {"type": "shape", "x": 0, "y": 200, "text": "Paid?", "shape": "diamond"},
             {"type": "line", "from": 0, "to": 4, "from_side": "bottom", "to_side": "top"},
             {"type": "line", "from": 0, "to": 4, "arrow": "none"}])
-    assert warnings.getvalue().count("warning:") == 1, "one warning for the sticker connector"
+    assert warnings.getvalue().count("warning:") == 0, warnings.getvalue()
     objects = mixed["data"]["objects"]
     assert objects[1]["widgetData"]["type"] == "sticker", "alias sticky -> sticker"
     line = objects[2]["widgetData"]["json"]
@@ -105,6 +105,14 @@ def main() -> None:
     expect_error([{"type": "sticker", "template_index": 1, "x": 0, "y": 0}], "not a sticker")
     expect_error([{"type": "line", "from": "0", "to": 1}], "earlier objects")
     expect_error([{"type": "line", "from": 0, "to": 0}], "earlier objects")
+
+    merged = compose.merge_templates(TEMPLATE, TEMPLATE)
+    assert len(merged["data"]["objects"]) == 7, "group record is not merged"
+    assert merged["data"]["objects"][6]["widgetData"]["json"]["primary"]["widgetIndex"] == -1, "merged line detached"
+    joined = compose.compose_mixed(merged, [{"type": "shape", "template_index": 5, "x": 0, "y": 0, "text": "S"},
+                                            {"type": "shape", "template_index": 1, "x": 200, "y": 0, "text": "T"},
+                                            {"type": "line", "template_index": 6, "from": 0, "to": 1}])
+    assert joined["data"]["objects"][2]["widgetData"]["json"]["secondary"]["widgetIndex"] == 1
 
     part = compose.subset(TEMPLATE, [1, 0, 2, 3])
     compose.validate(part)

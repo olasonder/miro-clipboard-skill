@@ -40,8 +40,8 @@ New objects are always clones of copied template objects; the scripts do not inv
    - notes: one sticky;
    - a flowchart: a rectangle, a diamond (rhombus), and a connector copied *with* a label if you want "yes/no" labels;
    - boxes with text: a shape; loose text: a text box.
-   Pick a specific template object with `template_index` (its index in the summary). To keep only part of a selection as a template: `python3 <skill>/scripts/miro-clipboard-read.py <capture> --subset 0,4,7 --write-capture <dir>/template.json`.
-2. **Measure.** The summary shows `size` and `scale`. A sticky's footprint is about `width * scale` by `height * scale` (about 86 x 98 in the sampled default). Plan positions from that.
+   Pick a specific template object with `template_index` (its index in the summary). Templates may come from several captures, even weeks old: add them with `--add-template <other capture>` and list the combined indexes with `--show-templates`. To keep only part of a selection as a template: `python3 <skill>/scripts/miro-clipboard-read.py <capture> --subset 0,4,7 --write-capture <dir>/template.json`.
+2. **Measure.** Positions are object centres. The summary shows `size` and `scale`; a sticky's footprint is about `width * scale` by `height * scale` (about 86 x 99 in Miro's default). Plan positions from that.
 3. **Write a scene** (see [scene-format.md](references/scene-format.md)). Every object needs `x`, `y` and `text`, except clones by `template_index`, which keep their text when you leave `text` out.
 4. **Compose:** `python3 <skill>/scripts/miro-clipboard-compose.py <dir>/template.json <dir>/scene.json <dir>/output.json`. On `error:`, fix the scene; the message names the field, the missing template type, or the broken reference. Mention every `warning:` to the user as something to check in Miro.
 5. **Replay:** tell the user this replaces what is on their clipboard, then run `swift <skill>/scripts/miro-clipboard-lab.swift replay <dir>/output.json` and ask them to paste (⌘V) in an empty area next to the original.
@@ -70,15 +70,15 @@ For fields the composer does not expose (frames, grids, groups, other styles):
 
 **Draw a flowchart.** Rectangles for steps, `"shape": "diamond"` for decisions (clone a copied shape; the code switches it), connectors with `from`/`to` in the order of the flow. Use `caption` for "yes"/"no" (the template line must have a label). Lay steps out left to right about 1.6 shape widths apart; send a second branch down with `"from_side": "bottom", "to_side": "top"`. Keep shapes in a row at equal heights.
 
-**Make notes in a colour.** Set `color`. Miro's own palette values have not been captured; two custom colours pasted correctly in tests, others are untested and Miro may adjust them. Use light colours, because a sticky's text colour cannot be set. Suggested light values (not Miro's own swatches): yellow `#FFF79E` (Miro's default), pink `#FFC9DE`, blue `#CDE5FF`, green `#C8F7C5`, orange `#FFE0B5`, purple `#E6DCFF`, grey `#EDEDED`. Tell the user which colours you used.
+**Make notes in a colour.** Set `color` to one of Miro's sixteen sticky colours, listed with descriptions in [observed-format.md](references/observed-format.md#miros-sticky-palette): for example light yellow `#FFF79E` (default), orange `#FFB575`, light pink `#FFD2F2`, pink `#FD9AE7`, light blue `#B2D0FE`, blue `#86B4F9`, violet `#B8ACFB`, green `#6AE08D`, light green `#D1F09F`, black `#151515`. Miro turns text white on the black sticky by itself. Tell the user which colours you used.
 
-**Make a sticky bigger.** Untested. Try `"scale"` with the template's scale multiplied (for twice as big: double it), on a test board first, and tell the user it may not work. The new note is a copy; the user deletes the old one.
+**Make a sticky bigger.** Set `"scale"` to the template's scale times the factor (twice as big: double it). Do not change `width`/`height`: that makes the sticky rectangular. The new note is a copy; the user deletes the old one.
 
 ## Limits
 
 - Only copied object types can be created: stickies, shapes, text, connectors and pen strokes. Cards, mind maps, documents, embeds, comments and icons have not been captured; do not guess their structure. Frames, grids and groups can only be edited through decoded JSON.
 - Images and data tables refer to board resources and may not work on another board.
-- Untested: connectors to stickies or text, top/bottom connector sides, removing a template label, sticky size and scale, newlines in stickies, rich text. See [evidence.md](references/evidence.md).
+- Untested: connectors to text boxes or frames, rich text, very long text, pasting on a different board or in another organisation. See [evidence.md](references/evidence.md).
 - Cloned notes keep the template's author field; Miro may show the original author.
 - The format may change with any Miro update. If decoding fails, run `swift <skill>/scripts/miro-clipboard-lab.swift inspect` on a test copy (it prints types and sizes only) and compare with [observed-format.md](references/observed-format.md).
 - After changing a script, run `python3 <skill>/scripts/selftest.py` and `swift <skill>/scripts/miro-clipboard-lab.swift selftest`.

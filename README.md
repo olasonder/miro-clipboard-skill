@@ -15,7 +15,7 @@ I built it in my own time, in September 2026.
 - **Make sense of a wall of notes.** Copy fifty stickies and ask the agent to summarise, cluster or find the gaps.
 - **Restructure.** Get clustered, renamed or rewritten notes back as a new selection you paste next to the original.
 - **Draw from text.** Describe a flow or a map, and get shapes connected by lines that stay attached when you move them.
-- **Colour by meaning.** Give notes and shapes any colour, for example assumptions in one colour and evidence in another.
+- **Colour by meaning.** Use Miro's own sixteen sticky colours, for example assumptions in one colour and evidence in another.
 
 Paste always adds a copy. Your original objects are never changed.
 

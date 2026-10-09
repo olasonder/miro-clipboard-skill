@@ -7,7 +7,7 @@ python3 scripts/miro-clipboard-compose.py /path/template.json /path/scene.json /
 swift scripts/miro-clipboard-lab.swift replay /path/output.json
 ```
 
-Every new object is a clone of a copied template object of the same type, so the template capture must contain at least one object of each type the scene uses. The composer checks every field, ID and reference before it writes anything, and stops with `error: ...` on anything it does not understand, including misspelled fields. Lines starting with `warning:` mean "this works locally but has not been verified in Miro; check the paste".
+Every new object is a clone of a copied template object of the same type, so the template capture must contain at least one object of each type the scene uses. If one capture lacks a type, add another capture with `--add-template other.json` (repeatable); its objects get the next indexes, which `--show-templates` prints. The composer checks every field, ID and reference before it writes anything, and stops with `error: ...` on anything it does not understand, including misspelled fields. Lines starting with `warning:` mean "this works locally but has not been verified in Miro; check the paste".
 
 ## Notes only
 
@@ -52,12 +52,12 @@ The template needs at least one sticky note; the first one is cloned.
 |---|---|---|
 | `x`, `y` | position; required | verified |
 | `text` | plain text, escaped for you. **Required**, unless `template_index` is set: then the clone keeps that object's text (use this to move notes without retyping them) | verified |
-| `width`, `height` | size | verified for shapes and text; untested for stickies (warning) |
-| `scale` | sets `scale` and `relativeScale` | untested (warning) |
+| `width`, `height` | size | verified for shapes and text. On a sticky it changes the shape (doubling both gave a wide rectangle), not the size; the composer warns |
+| `scale` | sets `scale` and `relativeScale`. To make a sticky twice as big, double the template's scale | verified for stickies; other types warn |
 | `rotation` | degrees | verified for shapes |
 | `shape` | shapes only: `rectangle`/`square`, `ellipse`/`circle`/`oval`, `triangle`, `rhombus`/`diamond`, or a code. Sets `shape` and `st` together | codes verified; other codes warn |
 
-A `\n` in `text` starts a new paragraph. That works in text boxes; in stickies it is untested.
+A `\n` in `text` starts a new paragraph (verified in text boxes and stickies; Miro shrinks a sticky's font to fit).
 
 Colour and style fields:
 
@@ -69,16 +69,16 @@ Colour and style fields:
 | shape | `text_color`, `font_size` | `tc`, `fs` | observed only |
 | text | `color` or `text_color`; `background` | `tc`; `bc` | observed only |
 
-Colours accept `"#RRGGBB"`, a decimal integer, or `"transparent"`. Note that `color` means the fill on shapes but the text colour on text boxes. There is no known key for the text colour of a sticky, so keep sticky colours light.
+Colours accept `"#RRGGBB"`, a decimal integer, or `"transparent"`. Note that `color` means the fill on shapes but the text colour on text boxes. For stickies, use the sixteen palette values in [observed-format.md](observed-format.md); on the black sticky Miro made the text white by itself.
 
 ## Line
 
 | Field | Use | Status |
 |---|---|---|
-| `from`, `to` | indexes of **earlier** objects in the scene. The line stays attached when they move | verified for shapes; other targets warn |
-| `from_side`, `to_side` | `left`, `right`, `top` or `bottom`. Default: from the right side of `from` to the left side of `to` | right/left verified; top/bottom untested |
+| `from`, `to` | indexes of **earlier** objects in the scene. The line stays attached when they move | verified for shapes and stickies; other targets warn |
+| `from_side`, `to_side` | `left`, `right`, `top` or `bottom`. Default: from the right side of `from` to the left side of `to` | verified |
 | `arrow` | `end` (default: points at `to`), `start`, `both` or `none` | end arrow verified |
-| `caption` | label text. The template line must have been copied with a label. A line **without** `caption` gets no label, even if the template had one | caption text verified; removing a label untested |
+| `caption` | label text. The template line must have been copied with a label. A line **without** `caption` gets no label, even if the template had one | verified |
 | `bend_points` | list of `{"x": ..., "y": ...}`. One bend point produced a visible bend; its coordinate system has not been isolated, so avoid it unless needed | partly verified |
 | `x1`, `y1`, `x2`, `y2` | a free line instead of an attached one | verified |
 | `color`, `thickness` | `lc`, `t` | observed only |
@@ -90,8 +90,8 @@ Colours accept `"#RRGGBB"`, a decimal integer, or `"transparent"`. Note that `co
 
 ## Layout tips
 
-- Measure the template first. The reader's summary shows `size` and `scale`; a sticky's footprint is `size` times `scale`. In the sampled default that was about 86 x 98, and a grid with 180 between columns and 160 between rows kept notes apart.
-- Whether `x, y` is an object's centre or corner has not been isolated. Keep shapes in one row at the same height so connectors line up.
+- `x, y` is the **centre** of an object.
+- Measure the template first. The reader's summary shows `size` and `scale`; a sticky's footprint is `size` times `scale`. In the sampled default that was about 86 x 99: 120 between centres leaves a small gap, 180 by 160 leaves room to read.
 - Put cluster headers above their notes, wrap columns at about five notes, and leave an empty column between clusters.
 - Positions are relative: a paste keeps the layout between objects. Ask the user to paste in an empty area next to the original.
 

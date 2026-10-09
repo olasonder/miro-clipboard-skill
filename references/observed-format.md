@@ -64,7 +64,7 @@ A capture contains the full text of what was copied, plus identifiers: the top-l
 Most objects in `data.objects` have `type: 14`, a zero-based `id`, a numeric-string `initialId`, `meta` and `widgetData`. `widgetData.type` names the kind; `widgetData.json` holds its properties. A group record is different: `type: 10` with an `items` array of member indexes and no `widgetData`.
 
 - **IDs.** `id` must equal the object's index in the array. Generated objects pasted when they had consecutive `id` values and distinct `initialId` strings derived from the template's `initialId` (template plus 1, 2, 3...). Do not invent arbitrary `initialId` values.
-- **Position.** Positioned objects have `_position.offsetPx` with `x` and `y` and `schema: "canvasOffsetPx"`. Grid cells use `schema: "gridOffsetPx"` instead. Whether `x, y` is the centre or a corner has not been isolated; relative layouts paste as intended.
+- **Position.** Positioned objects have `_position.offsetPx` with `x` and `y` and `schema: "canvasOffsetPx"`. Grid cells use `schema: "gridOffsetPx"` instead. `x, y` is the object's **centre**: two stickies of different sizes at the same `y` pasted with their centres level (paste confirmed for stickies; shape rows aligned the same way).
 - **Size and scale.** `size` holds `width` and `height`. Many objects also have `scale.scale` and `relativeScale`. The footprint on the board appears to be size times scale (see stickies). Scale edits have not been tested on their own.
 - **Rotation.** `rotation.rotation` and `relativeRotation`, in degrees. Setting both to 25 rotated a shape by about 25 degrees (paste confirmed).
 - **Parent.** `_parent` is usually `null`. Grid cells point to their grid with `_parent.index`.
@@ -86,13 +86,40 @@ Most objects in `data.objects` have `type: 14`, a zero-based `id`, a numeric-str
 | Frame title | `tc` | 6052956 | `#5C5C5C` | copied |
 | Frame fill | `bc` | 16777215 | `#FFFFFF` | copied |
 
-Miro's sticky colour palette (the swatches in its colour picker) has **not** been captured yet. Two custom colours pasted as given (the pale green sticky and the blue and red shape above); other values are untested, and it is not known whether Miro adjusts a colour to its nearest swatch. To add a palette, copy one sticky of each swatch on a test board, capture, and read the `sbc` values with `miro-clipboard-read.py` (the summary shows each object's colour).
+## Miro's sticky palette
+
+Captured on 9 October 2026 from one sticky of each colour in Miro's colour picker, in the order they were placed on the test board. All sixteen pasted back with their colour (paste confirmed). The names are plain descriptions, not Miro's own names.
+
+| # | Description | Hex | `sbc` |
+|---|---|---|---|
+| 1 | light yellow (Miro's default) | `#FFF79E` | 16775070 |
+| 2 | yellow | `#FFE86D` | 16771181 |
+| 3 | orange | `#FFB575` | 16758133 |
+| 4 | red | `#FF9E9E` | 16752286 |
+| 5 | light pink | `#FFD2F2` | 16765682 |
+| 6 | pink | `#FD9AE7` | 16620263 |
+| 7 | light blue | `#B2D0FE` | 11718910 |
+| 8 | violet | `#B8ACFB` | 12102907 |
+| 9 | cyan | `#9CE6FF` | 10282751 |
+| 10 | blue | `#86B4F9` | 8828153 |
+| 11 | turquoise | `#81E7DE` | 8513502 |
+| 12 | green | `#6AE08D` | 7004301 |
+| 13 | light green | `#D1F09F` | 13758623 |
+| 14 | lime | `#B3E65F` | 11789919 |
+| 15 | white | `#F3F5F7` | 15988215 |
+| 16 | black | `#151515` | 1381653 |
+
+On the black sticky Miro showed the text in white by itself; the sticky has no text-colour key. Prefer these values over invented ones. Custom colours also pasted as given (the pale green `#C8F7C5` in the table above), but they will not match the picker.
+
 
 ## Sticky note, `widgetData.type: "sticker"`
 
 Fields: `text`, `size`, `scale`, `relativeScale`, `rotation`, `relativeRotation`, `_position`, `_parent`, `style`, `ns:author`.
 
-The copied sticky had `size` 199 x 228 and `scale` 0.43, so it occupied about 86 x 98 on the canvas. Twenty-five generated stickies spaced 180 apart horizontally and 160 vertically pasted as five readable rows. Always compute the footprint from your own template: `width * scale`, `height * scale`.
+The copied stickies had `size` 199 x 228 and `scale` 0.43, so they occupied about 86 x 99 on the canvas. Twenty-five generated stickies spaced 180 apart horizontally and 160 vertically pasted as five readable rows; sixteen spaced 120 by 130 sat close but apart. Always compute the footprint from your own template: `width * scale`, `height * scale`.
+
+- **Bigger or smaller:** change `scale` (and `relativeScale` to the same number). Doubling it gave a sticky twice as big (paste confirmed).
+- **Do not use `size` to resize.** Doubling width and height gave a wide, rectangular sticky of the original height (paste confirmed). Use `size` only if you want that rectangular shape.
 
 | Style key | Observed | Meaning | Status |
 |---|---|---|---|
@@ -103,7 +130,7 @@ The copied sticky had `size` 199 x 228 and `scale` 0.43, so it occupied about 86
 | `taw`, `tah` | 0, 0 | unknown | observed only |
 | `lh` | 1.36 | line height | observed only |
 
-Keep `ns:author` when cloning. Clones therefore carry the template's author; whether Miro shows that person as the author of the new notes has not been checked. Changing text length, Unicode, emoji and `&` all pasted as editable stickies. Newlines as separate `<p>` paragraphs have not been paste-tested.
+Keep `ns:author` when cloning. Clones therefore carry the template's author; whether Miro shows that person as the author of the new notes has not been checked. Changing text length, Unicode, emoji and `&` all pasted as editable stickies. Two `<p>` paragraphs showed as two lines (paste confirmed); Miro shrinks the font to fit.
 
 ## Shape, `widgetData.type: "shape"`
 
@@ -153,7 +180,9 @@ Each endpoint looks like:
 - **Free.** `widgetIndex: -1` at an end; `point` then holds canvas coordinates. A free arrow did not follow moving shapes (paste confirmed).
 - **Bend points.** `points: [{"x": ..., "y": ...}]` gave a visible bend that stayed sensible after moving a shape (paste confirmed).
 - **Caption.** `line.captions[0].text` is HTML. Changing it to `Nieuw label` showed in Miro (paste confirmed). Only lines copied with a caption have the caption structure.
-- **Connectors to stickies, text or frames** have not been verified. The composer allows them and prints a warning; check the paste.
+- **Sides.** `x: 0.5, y: 1` is the middle of the bottom, `x: 0.5, y: 0` the middle of the top. A connector from the bottom of a diamond to the top of a box pasted as intended (paste confirmed).
+- **Connectors between sticky notes** stayed attached and curved along when a note was moved (paste confirmed). Connectors to text boxes or frames have not been verified; the composer warns.
+- **No label.** Setting `line.captions` to `[]` on a clone of a labelled line removed the label (paste confirmed).
 
 | Style key | Observed | Meaning | Status |
 |---|---|---|---|
@@ -189,6 +218,10 @@ Holds position, scale, crop, title, alt text, a border style and a `resource` ob
 ## Group, object `type: 10`
 
 No `widgetData`; `items` lists member indexes, and the group record comes after its members. A generated group of two shapes and a connector pasted and moved together (paste confirmed). Editing a child and ungrouping have not been tested.
+
+## Reusing captures
+
+A capture made three weeks earlier still served as a template (paste confirmed, on the same board). A connector from that old capture, added to stickies copied that day, pasted and stayed attached (paste confirmed). The composer's `--add-template` option does this merge. Pasting on a different board has not been tested.
 
 ## Not captured yet
 

@@ -22,18 +22,16 @@ These were generated from captured samples and pasted successfully: Unicode and 
 
 **First, for everyday use**
 
-- Sticky palette: copy one sticky of every swatch in Miro's colour picker, capture, and record each `sbc` value in `observed-format.md`.
-- Connector between two stickies, and between a sticky and a shape. Move both ends.
-- Connector sides `top` and `bottom`, and a line without a label cloned from a labelled template (the composer empties `line.captions`).
-- Sticky `scale` versus `size`: which one makes a note bigger.
-- Newlines in a sticky (two `<p>` paragraphs) and very long text.
-- Paste the same generated capture on a second board, and after reloading Miro.
+Done on 9 October 2026: the sticky palette, connectors between stickies, top and bottom connector sides, removing a template label, sticky `scale` versus `size`, newlines in a sticky, and reuse of a three-week-old capture on the same board (see `evidence.md`, item 12).
+
+- Connector between a sticky and a shape, and to a text box. Move both ends.
+- Very long text in a sticky.
+- Paste a generated capture on a different board, and in another Miro organisation.
 
 **Then, to make styling reliable**
 
 - Change one style key per capture for shapes (`bc`, `brc`, `brw`, `brr`, `tc`, `fs`, alignment) and compare with a screenshot of the original.
 - Line looks: straight, curved, elbow; dashed; thickness; start and end arrows. Map `ls`, `lt`, `t`, `a_start`, `a_end`.
-- Sticky size versus `scale` and `relativeScale`.
 - Rotation with `rotation` only and `relativeRotation` only.
 
 **Later, as needed**
