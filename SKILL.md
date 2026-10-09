@@ -76,6 +76,8 @@ For fields the composer does not expose (grids, images, other styles):
 
 **Draw a flowchart.** Rectangles for steps, `"shape": "diamond"` for decisions (clone a copied shape; the code switches it), connectors with `from`/`to` in the order of the flow. Use `caption` for "yes"/"no" (the template line must have a label). Lay steps out left to right about 1.6 shape widths apart; send a second branch down with `"from_side": "bottom", "to_side": "top"`. Keep shapes in a row at equal heights.
 
+**Draw line art.** Write each line as a list of board coordinates and give it as a pen stroke: `{"type": "paint", "path": [[x, y], ...], "color": "#1A1A1A", "thickness": 2}`. Sample curves densely; it is easiest to generate the scene with a short script (see `examples/mona-lisa.py`, which draws the Mona Lisa in 57 strokes). The template needs one copied pen stroke. Put the strokes in a `frame` (or a `group`) so the drawing moves as one piece. Preview locally first if you can: draw the same coordinates into an image and look at it.
+
 **Make notes in a colour.** Set `color` to one of Miro's sixteen sticky colours, listed with descriptions in [observed-format.md](references/observed-format.md#miros-sticky-palette): for example light yellow `#FFF79E` (default), orange `#FFB575`, light pink `#FFD2F2`, pink `#FD9AE7`, light blue `#B2D0FE`, blue `#86B4F9`, violet `#B8ACFB`, green `#6AE08D`, light green `#D1F09F`, black `#151515`. Miro turns text white on the black sticky by itself. Tell the user which colours you used.
 
 **Make a sticky bigger.** Set `"scale"` to the template's scale times the factor (twice as big: double it). Do not change `width`/`height`: that makes the sticky rectangular. The new note is a copy; the user deletes the old one.

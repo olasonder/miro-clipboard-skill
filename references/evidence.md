@@ -26,6 +26,8 @@ Observed with disposable Miro boards and invented content, in Chrome on macOS, S
 
 13. **9 October 2026, stress test.** An agent with only the skill as documentation turned a messy 24-note workshop wall into a 64-object synthesis: recoloured notes, merged duplicates, a parked area, an extended legend as a group, an assumption-to-test map with two decision diamonds and four labelled connectors, and a corrected process flow, all in a frame. It pasted cleanly. The objects did not move with the frame until `_parent` links were added; with them, all 63 moved with the frame. The legend group (five stickies and a text box) moved as one piece. A follow-up showed that `fs` with `fsa: 0` gives stickies one fixed text size.
 
+14. **9 October 2026, drawing.** The Mona Lisa as 57 calculated pen strokes in a frame (`examples/mona-lisa.py`): all strokes lined up, which confirms that a stroke's position is the centre of its points and the points start at its top-left corner. Colour and thickness took effect.
+
 A visual pass means the objects appeared. Behaviour (editing, moving, persistence after reload) is confirmed only where stated.
 
 ## Confirmed by local checks only

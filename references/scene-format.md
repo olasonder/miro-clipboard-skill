@@ -114,9 +114,22 @@ Put the frame **first** (or at least before its contents), so it sits behind the
 
 `items` lists indexes of **earlier** objects in the scene; Miro then moves them as one piece. No template needed. Verified for shapes with a connector, and for stickies with a text box.
 
-## Paint
+## Paint (pen strokes)
 
-`x`, `y`, `points` (a list of `{"x": ..., "y": ...}` relative to the stroke's position), `color`, `thickness`, `rotation`, `scale`.
+The easy way: give the stroke as board coordinates and let the composer place it.
+
+```json
+{"type": "paint", "path": [[100, 50], [140, 90], [120, 150]], "color": "#1A1A1A", "thickness": 2}
+```
+
+| Field | Use | Status |
+|---|---|---|
+| `path` | list of `[x, y]` (or `{"x": .., "y": ..}`) in board coordinates. Sample curves densely (20 to 60 points) for smooth lines | verified: 57 strokes lined up into one drawing |
+| `x`, `y`, `points` | the raw form instead of `path`: the stroke's centre, and points measured from the stroke's own top-left corner | verified |
+| `color`, `thickness` | `lc`, `t`. Thickness 1 to 3 suits line art; fractions such as 1.5 work | verified |
+| `rotation`, `scale` | as for other objects | untested for strokes |
+
+Every stroke is a separate object. To move a drawing as one piece, put it in a `frame` or a `group`. See `examples/mona-lisa.py` for a complete drawing.
 
 ## Layout tips
 

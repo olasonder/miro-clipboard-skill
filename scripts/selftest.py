@@ -38,6 +38,7 @@ TEMPLATE = {"isProtected": False, "boardId": "synthetic", "version": 2, "host": 
     {"type": 10, "id": 3, "initialId": "1030", "items": [0, 1, 2]},
     obj(4, "frame", text="Frame", x=0, y=0, width=100, height=100, size={"width": 100, "height": 100},
         style=json.dumps({"fs": 14, "bc": 16777215})),
+    obj(5, "paint", points=[{"x": 0, "y": 0}, {"x": 10, "y": 10}], style=json.dumps({"lc": 16686925, "t": 4})),
 ]}}
 
 
@@ -101,6 +102,13 @@ def main() -> None:
     expect_error([{"type": "sticker", "x": 0, "y": 0, "text": "x", "colour": "#FFFFFF"}], "unknown field")
     expect_error([{"type": "sticker", "x": 0, "y": 0}], "needs 'text'")
     expect_error([{"type": "image", "x": 0, "y": 0}], "cannot be composed")
+    drawn = compose.compose_mixed(TEMPLATE, [{"type": "paint", "path": [[100, 50], [140, 90], [120, 150]],
+                                              "color": "#1A1A1A", "thickness": 2}])
+    stroke = drawn["data"]["objects"][0]["widgetData"]["json"]
+    assert stroke["_position"]["offsetPx"] == {"x": 120, "y": 100}, stroke["_position"]
+    assert stroke["points"][0] == {"x": 0, "y": 0} and stroke["points"][2] == {"x": 20, "y": 100}
+    assert json.loads(stroke["style"])["lc"] == 0x1A1A1A and json.loads(stroke["style"])["t"] == 2
+    expect_error([{"type": "paint", "path": [[0, 0], [1, 1]], "x": 0, "y": 0}], "either 'path'")
     expect_error([{"type": "shape", "x": 0, "y": 0, "text": "a"},
                   {"type": "frame", "x": 0, "y": 0, "width": 10, "height": 10, "contains": [0]}], "before its contents")
     expect_error([{"type": "shape", "x": 0, "y": 0, "text": "a"}, {"type": "group", "items": [0, 5]}], "earlier")
@@ -130,11 +138,11 @@ def main() -> None:
     expect_error([{"type": "line", "from": 0, "to": 0}], "earlier objects")
 
     merged = compose.merge_templates(TEMPLATE, TEMPLATE)
-    assert len(merged["data"]["objects"]) == 9, "group record is not merged"
-    assert merged["data"]["objects"][7]["widgetData"]["json"]["primary"]["widgetIndex"] == -1, "merged line detached"
-    joined = compose.compose_mixed(merged, [{"type": "shape", "template_index": 6, "x": 0, "y": 0, "text": "S"},
+    assert len(merged["data"]["objects"]) == 11, "group record is not merged"
+    assert merged["data"]["objects"][8]["widgetData"]["json"]["primary"]["widgetIndex"] == -1, "merged line detached"
+    joined = compose.compose_mixed(merged, [{"type": "shape", "template_index": 7, "x": 0, "y": 0, "text": "S"},
                                             {"type": "shape", "template_index": 1, "x": 200, "y": 0, "text": "T"},
-                                            {"type": "line", "template_index": 7, "from": 0, "to": 1}])
+                                            {"type": "line", "template_index": 8, "from": 0, "to": 1}])
     assert joined["data"]["objects"][2]["widgetData"]["json"]["secondary"]["widgetIndex"] == 1
 
     part = compose.subset(TEMPLATE, [1, 0, 2, 3])

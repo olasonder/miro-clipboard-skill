@@ -198,7 +198,11 @@ Three copied line styles pasted with visibly different routes or strokes, but th
 
 ## Freehand drawing, `widgetData.type: "paint"`
 
-A pen stroke, not a connector. Fields: `_position.offsetPx`, `points` (a list of `x, y`), transform fields, `style` with `lc` (colour), `t` (thickness, 4 in the sample), `lo` and `e`. Calculated point arrays (a wave and a zigzag) pasted as strokes (paste confirmed). Paint has no endpoints, so it does not follow other objects.
+A pen stroke, not a connector. Fields: `_position.offsetPx`, `points` (a list of `x, y`), transform fields, `style` with `lc` (colour), `t` (thickness, 4 in the sample), `lo` and `e`. It has no `size`.
+
+- **Coordinates.** The points are measured from the top-left corner of the stroke's own bounding box (copied strokes start at 0, 0), and `_position` is the **centre** of that box. Placing 57 calculated strokes this way gave a drawing in which every line met the others where intended (paste confirmed).
+- **Style.** `lc` set to `#1A1A1A` gave black lines, and `t` from 1 to 3 (including 1.5) gave visibly different widths (paste confirmed). `lo` and `e` are unknown; keep them.
+- Paint has no endpoints, so it does not follow other objects. Strokes inside a frame were drawn inside it.
 
 ## Frame, `widgetData.type: "frame"`
 
