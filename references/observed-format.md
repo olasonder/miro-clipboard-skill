@@ -1,13 +1,205 @@
-# Observed Miro clipboard format
+# Miro clipboard: observed format and object guide
 
-Observed in Miro running in Chrome on macOS. This is an undocumented format, not a public Miro API.
+This guide records experiments on macOS with Miro in Chrome, September 2026, on disposable boards with invented content. It describes the copied selection format as observed. It is not a public Miro contract, and Miro may change it without notice. Every claim says whether a Miro paste confirmed it or whether it comes from local decoding only. The paste observations are listed in [evidence.md](evidence.md); open questions and test cases are in [test-plan.md](test-plan.md).
 
-`public.html` contains a `data-meta` attribute with `(miro-data-v1)` and `(/miro-data-v1)` around Base64. Decode that Base64, subtract 59 from each byte modulo 256, and parse the resulting UTF-8 JSON. Encoding reverses the steps. The capture file itself also Base64 encodes each raw pasteboard representation.
+## What the experiments prove
 
-The decoded document contains `data.objects`. Most objects have an `id` equal to their array index, a numeric-string `initialId`, `meta`, and `widgetData`. `widgetData.type` identifies the object kind; `widgetData.json` holds position, content, style, and relationships. Some styles are JSON strings inside that JSON.
+- `public.html` alone recreates editable Miro objects. The Chromium source token, source URL and plain-text representation were not needed.
+- Removing Miro's `data-meta` attribute stops native paste. Changing only the visible HTML fallback does not change a native sticky's text.
+- Rewriting the decoded JSON produced stickies with new and longer text, three and twenty-five generated stickies, mixed shapes and stickies, recoloured stickies and shapes, connected and free lines, frames, grids, groups and an 18-object diagram.
+- A generated connector stayed attached and rerouted when a connected shape was moved.
+- Pasting always creates new objects. Nothing here edits existing board objects in place.
 
-Observed object kinds include `sticker`, `shape`, `text`, `line`, `paint`, `frame`, `grid`, `grid_text`, `image`, and `data_table_widget`. A group is a separate object with an `items` array of member indices. Connected line endpoints use `primary.widgetIndex` and `secondary.widgetIndex` to point at objects in the same selection. A value of `-1` means a free endpoint. Grid cells point to their grid through `_parent.index`.
+The experiments do **not** prove that every property below is writable. Each section states its status.
 
-The composer supports copied stickies, shapes, text boxes, freehand strokes, connected lines, and free lines. Groups, grids, frames, and additional style fields require editing the decoded JSON directly; they are not exposed as scene composer operations. Check behavior in Miro after pasting.
+## The clipboard envelope
 
-Image objects contain resource references rather than pixels in the inspected JSON. Data-table widgets contain table and view IDs rather than inline cell content. Cross-board portability remains unknown. Clipboard captures may contain board, organization, author, object, and resource IDs along with private text. Store captures outside Git, and share summaries only when the text itself may be shared.
+`scripts/miro-clipboard-lab.swift capture` writes every macOS pasteboard representation into a local JSON file. Each representation's `data` is Base64 of its raw bytes. This outer Base64 belongs to the capture file, not to Miro.
+
+A Miro copy in Chrome produced one pasteboard item with:
+
+```text
+public.html
+public.utf8-plain-text
+org.chromium.internal.source-rfh-token
+org.chromium.source-url
+```
+
+`public.html` holds an empty `span` with a `data-meta` attribute. Its value contains `(miro-data-v1)` and `(/miro-data-v1)` around another Base64 string. The HTML after `</span>` is a visible fallback for other apps. Miro reads the encoded data for native paste.
+
+Decoding and encoding:
+
+```python
+payload = base64.b64decode(inner_value)
+document = json.loads(bytes((byte - 59) % 256 for byte in payload))
+
+json_bytes = json.dumps(document, separators=(",", ":")).encode("utf-8")
+inner_value = base64.b64encode(bytes((byte + 59) % 256 for byte in json_bytes))
+```
+
+The shift works on UTF-8 **bytes**, not characters. It is an encoding, not encryption. The composer and reader do this for you and write captures with `public.html` only.
+
+The decoded document, identifiers omitted:
+
+```json
+{
+  "isProtected": false,
+  "boardId": "...",
+  "data": {"objects": [], "meta": {}},
+  "version": 2,
+  "host": "miro.com",
+  "asPortalAmount": 0,
+  "copierType": "COPY"
+}
+```
+
+Keep top-level fields as copied. Which ones Miro requires has not been established.
+
+## Privacy
+
+A capture contains the full text of what was copied, plus identifiers: the top-level `boardId`, and per object a `meta` block with `boardId`, `orgId` (the Miro organisation) and `widgetToken`. Stickies also carry `ns:author` with an author ID. Images carry resource IDs. Keep captures and decoded JSON local, outside Git, and never share a capture of a real or confidential board. Share summaries only when the text itself may be shared.
+
+## Common object rules
+
+Most objects in `data.objects` have `type: 14`, a zero-based `id`, a numeric-string `initialId`, `meta` and `widgetData`. `widgetData.type` names the kind; `widgetData.json` holds its properties. A group record is different: `type: 10` with an `items` array of member indexes and no `widgetData`.
+
+- **IDs.** `id` must equal the object's index in the array. Generated objects pasted when they had consecutive `id` values and distinct `initialId` strings derived from the template's `initialId` (template plus 1, 2, 3...). Do not invent arbitrary `initialId` values.
+- **Position.** Positioned objects have `_position.offsetPx` with `x` and `y` and `schema: "canvasOffsetPx"`. Grid cells use `schema: "gridOffsetPx"` instead. Whether `x, y` is the centre or a corner has not been isolated; relative layouts paste as intended.
+- **Size and scale.** `size` holds `width` and `height`. Many objects also have `scale.scale` and `relativeScale`. The footprint on the board appears to be size times scale (see stickies). Scale edits have not been tested on their own.
+- **Rotation.** `rotation.rotation` and `relativeRotation`, in degrees. Setting both to 25 rotated a shape by about 25 degrees (paste confirmed).
+- **Parent.** `_parent` is usually `null`. Grid cells point to their grid with `_parent.index`.
+- **Style strings.** Most `style` values are **JSON stored as a string** inside the JSON. Parse it, change only the keys you need, and serialise it back. Replacing the whole style resets every other setting. The composer's `set_style()` does this.
+- **Colours.** Colour values are decimal RGB integers: `#FFF79E` is `16775070`. `-1` means none or transparent. Convert with `int("FFF79E", 16)` and back with `"#%06X" % value`.
+- **Text.** Text is HTML. Escape user text and wrap each line in `<p>...</p>`. Accents, emoji and `&` pasted correctly. Rich text (bold, lists, links) has not been tested; copy a Miro example first if you need it.
+- **Index references.** Line endpoints, group `items` and grid `_parent.index` refer to array positions. When you remove, reorder or extract objects, rebase all of them. `subset()` in the composer and `miro-clipboard-read.py --subset` do this.
+
+## Colours seen so far
+
+| Where | Key | Value | Hex | Status |
+|---|---|---|---|---|
+| Default yellow sticky | `sbc` | 16775070 | `#FFF79E` | copied |
+| Recoloured sticky | `sbc` | 13170629 | `#C8F7C5` (pale green) | paste confirmed |
+| Default shape border and text | `brc`, `tc`, `sc` | 1710618 | `#1A1A1A` | copied |
+| Recoloured shape fill / border | `bc` / `brc` | 14215423 / 12599360 | `#D8E8FF` / `#C04040` | paste confirmed together |
+| Default connector | `lc` | 3355443 | `#333333` | copied |
+| Freehand pen | `lc` | 16686925 | `#FE9F4D` (orange) | copied |
+| Frame title | `tc` | 6052956 | `#5C5C5C` | copied |
+| Frame fill | `bc` | 16777215 | `#FFFFFF` | copied |
+
+Miro's sticky colour palette (the swatches in its colour picker) has **not** been captured yet, and it is not known whether Miro snaps an arbitrary colour to the nearest swatch. Arbitrary hex values pasted as that colour in the tests above. To add a palette, copy one sticky of each swatch on a test board, capture, and read the `sbc` values with `miro-clipboard-read.py` (the summary shows each object's colour).
+
+## Sticky note, `widgetData.type: "sticker"`
+
+Fields: `text`, `size`, `scale`, `relativeScale`, `rotation`, `relativeRotation`, `_position`, `_parent`, `style`, `ns:author`.
+
+The copied sticky had `size` 199 x 228 and `scale` 0.43, so it occupied about 86 x 98 on the canvas. Twenty-five generated stickies spaced 180 apart horizontally and 160 vertically pasted as five readable rows. Always compute the footprint from your own template: `width * scale`, `height * scale`.
+
+| Style key | Observed | Meaning | Status |
+|---|---|---|---|
+| `sbc` | 16775070 | background colour | paste confirmed |
+| `fs`, `fsa` | 0, 1 | font size, auto-size on (assumed) | observed only |
+| `ffn` | "Noto Sans" | font family | observed only |
+| `ta`, `tav` | "c", "m" | horizontal and vertical text alignment | observed only |
+| `taw`, `tah` | 0, 0 | unknown | observed only |
+| `lh` | 1.36 | line height | observed only |
+
+Keep `ns:author` when cloning. Changing text length, Unicode, emoji and `&` all pasted as editable stickies. Newlines as separate `<p>` paragraphs have not been paste-tested.
+
+## Shape, `widgetData.type: "shape"`
+
+Fields: `text`, `shape` (a code as a string), `size`, transform fields, `_position`, `style`.
+
+| Shape | `shape` / `st` | Status |
+|---|---|---|
+| Rectangle, square | `"3"` | paste confirmed |
+| Ellipse, circle | `"4"` | paste confirmed |
+| Triangle | `"5"` | paste confirmed |
+| Rhombus (diamond) | `"8"` | paste confirmed |
+
+Square versus rectangle and circle versus oval come from `size`, not from the code. Other shapes (arrows, stars, callouts, cylinders...) have not been captured. Do not guess their codes; copy one first.
+
+| Style key | Default | Meaning | Status |
+|---|---|---|---|
+| `bc` | -1 | fill colour (-1 transparent) | paste confirmed with others |
+| `bo` | 1 | fill opacity | observed only |
+| `brc` | 1710618 | border colour | paste confirmed with others |
+| `brw` | 2 | border width | paste confirmed with others |
+| `brr` | 0 | corner radius (rectangles only) | paste confirmed with others |
+| `bro`, `brs` | 1, 2 | border opacity, border style | observed only |
+| `sc` | 1710618 | stroke colour, equal to `brc` in captures | observed only |
+| `st` | same as `shape` | shape type | observed only |
+| `tc`, `fs`, `ffn` | 1710618, 14, "Noto Sans" | text colour, font size, font | observed only |
+| `ta`, `tav` | "c", "m" | text alignment | observed only |
+| `b`, `i`, `u`, `s` | 0 | bold, italic, underline, strike | observed only |
+| `ss`, `tsc`, `bsc`, `hl`, `VER` | 2, 1, 1, 0, 2.1 | unknown or version | observed only |
+
+The fill, border colour, border width and radius were changed **together** in one paste test (a pale-blue shape with a thick red rounded border). Change one key at a time before treating each mapping as certain.
+
+## Text box, `widgetData.type: "text"`
+
+Fields: `text`, `size`, transform fields, `_position`, `style`. The copied text box had `style.st: 14`, `ta: "l"`, transparent background `bc: -1`, text colour `tc`, font `ffn`, padding `p: 0` and font weight `fw: 0`. A generated two-paragraph box showed both lines and a literal `&` (paste confirmed). Font size control has not been tested.
+
+## Line and connector, `widgetData.type: "line"`
+
+Fields: `primary`, `secondary`, `points` (bend points), `line.captions`, `style`; `_position` is usually `null`.
+
+Each endpoint looks like:
+
+```json
+{"point": {"x": 1, "y": 0.5}, "positionType": 0, "widgetIndex": 0}
+```
+
+- **Attached.** `widgetIndex` is the index of another object in the same array. `point` is then relative to that object: `x: 1, y: 0.5` is the middle of its right side, `x: 0, y: 0.5` the middle of its left side. The target must come **before** the line in the array. A generated shape-to-shape connector stayed attached and rerouted when a shape moved (paste confirmed).
+- **Free.** `widgetIndex: -1` at an end; `point` then holds canvas coordinates. A free arrow did not follow moving shapes (paste confirmed).
+- **Bend points.** `points: [{"x": ..., "y": ...}]` gave a visible bend that stayed sensible after moving a shape (paste confirmed).
+- **Caption.** `line.captions[0].text` is HTML. Changing it to `Nieuw label` showed in Miro (paste confirmed). Only lines copied with a caption have the caption structure.
+- **Connectors to stickies, text or frames** have not been verified. The composer allows them and prints a warning; check the paste.
+
+| Style key | Observed | Meaning | Status |
+|---|---|---|---|
+| `lc` | 3355443 | line colour | observed only |
+| `t` | 2 | thickness (assumed) | observed only |
+| `a_start`, `a_end` | 0, 9 | arrowheads; 9 showed an arrow at the end | arrow paste confirmed |
+| `ls` | 1 or 2 | unknown (line style or shape) | observed only |
+| `lt` | 0, 1 or 2 | unknown (route type) | observed only |
+| `jump`, `VER` | 0, 2 | line jumps, version | observed only |
+
+Three copied line styles pasted with visibly different routes or strokes, but the meaning of each `ls` and `lt` value has not been isolated. To get a specific look (elbow, curved, dashed), copy a line with that look and use it as the template.
+
+## Freehand drawing, `widgetData.type: "paint"`
+
+A pen stroke, not a connector. Fields: `_position.offsetPx`, `points` (a list of `x, y`), transform fields, `style` with `lc` (colour), `t` (thickness, 4 in the sample), `lo` and `e`. Calculated point arrays (a wave and a zigzag) pasted as strokes (paste confirmed). Paint has no endpoints, so it does not follow other objects.
+
+## Frame, `widgetData.type: "frame"`
+
+Fields: plain-text `text` (the title), `x`, `y`, `width`, `height`, `_position.offsetPx`, `size`, transform fields, `style` (`fs`, `tc`, `ta`, `ff`, `ss`, `sc`, `bc`, `fo`, `fd`), `boardId`, `prevFrameIndex`, `isClusteringContainer`. Position and size appear twice; change both. A renamed and resized frame pasted (paste confirmed). Whether objects pasted with a frame become its children has not been tested.
+
+## Grid and cells, `grid` plus `grid_text`
+
+An older table type: one `grid` object and one `grid_text` per cell. `grid.gridRoot` holds `columnsOrder`, `columns`, `rowsOrder`, `rows`, styles and merges. Each cell has HTML in `html`, `_position` with `schema: "gridOffsetPx"`, row and column IDs, and `_parent.index` pointing to the grid. A 2 x 2 grid with edited cells pasted and rendered small (paste confirmed). Adding rows or columns has not been tested.
+
+## Data table, `widgetData.type: "data_table_widget"`
+
+A newer table type. The clipboard holds `tableId` and `viewId`, not cell values. It pasted as a table shell; the source table was empty too. New tables cannot be created from cell content through this format.
+
+## Image, `widgetData.type: "image"`
+
+Holds position, scale, crop, title, alt text, a border style and a `resource` object (ID, board ID, name, dimensions). No pixels. A copy pasted with its pixels on the source account. Other boards, other accounts and new images have not been tested.
+
+## Group, object `type: 10`
+
+No `widgetData`; `items` lists member indexes, and the group record comes after its members. A generated group of two shapes and a connector pasted and moved together (paste confirmed). Editing a child and ungrouping have not been tested.
+
+## Not captured yet
+
+Cards, mind-map nodes, documents, embeds, comments, reactions, icons, kanban and app widgets. Do not infer their structure from other objects. Copy a small disposable sample, capture it, and read it first.
+
+## Working with a real selection
+
+1. Select only the objects the question needs, copy, and capture with `swift scripts/miro-clipboard-lab.swift capture /path/capture.json`.
+2. Summarise with `python3 scripts/miro-clipboard-read.py /path/capture.json`. Add `--decode-to /path/decoded.json` only when you need every field.
+3. Keep the original capture unchanged. Either compose new objects from a scene, or edit a copy of the decoded JSON and encode it with `--encode-from ... --write-capture ...`. The encoder checks IDs and every index reference and confirms the round trip.
+4. Replay with `swift scripts/miro-clipboard-lab.swift replay /path/output.json` and paste in Miro.
+5. Check the result: edit text, move shapes to test connectors, resize, and reload the board when persistence matters.
+
+An agent in a sandbox may be able to read files but not the live clipboard. In that case it gives the user the exact capture and replay commands to run in their own Terminal.

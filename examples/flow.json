@@ -1,0 +1,8 @@
+{"objects": [
+  {"type": "shape", "x": 0, "y": 0, "width": 180, "height": 90, "text": "Client question"},
+  {"type": "shape", "x": 280, "y": 0, "width": 180, "height": 90, "text": "Explore the context"},
+  {"type": "shape", "x": 560, "y": 0, "width": 180, "height": 90, "text": "Real problem", "fill": "#E6DCFF"},
+  {"type": "line", "from": 0, "to": 1},
+  {"type": "line", "from": 1, "to": 2},
+  {"type": "sticker", "x": 280, "y": 180, "text": "Who else should we talk to?", "color": "#FFF79E"}
+]}

@@ -15,6 +15,7 @@ I built it in my own time, in September 2026.
 - **Make sense of a wall of notes.** Copy fifty stickies and ask the agent to summarise, cluster or find the gaps.
 - **Restructure.** Get clustered, renamed or rewritten notes back as a new selection you paste next to the original.
 - **Draw from text.** Describe a flow or a map, and get shapes connected by lines that stay attached when you move them.
+- **Colour by meaning.** Give notes and shapes any colour, for example assumptions in one colour and evidence in another.
 
 Paste always adds a copy. Your original objects are never changed.
 
@@ -46,7 +47,16 @@ python3 scripts/miro-clipboard-compose.py /path/selection.capture.json examples/
 swift scripts/miro-clipboard-lab.swift replay /path/new-notes.capture.json
 ```
 
-The template for `examples/notes.json` must contain exactly one copied sticky note. The skill instructions are in [SKILL.md](SKILL.md). [Scene format](references/scene-format.md) documents the supported composer fields, and [observed format](references/observed-format.md) describes the clipboard structure and current limits.
+New objects are clones of copied samples, so the template capture needs one object of each type you create (a sticky for `examples/notes.json`; shapes, a line and a sticky for `examples/flow.json`).
+
+Everything the skill knows is written down:
+
+- [SKILL.md](SKILL.md): the agent's instructions and recipes.
+- [Observed format](references/observed-format.md): every object type, field, style key and colour seen so far, and what has been verified.
+- [Scene format](references/scene-format.md): what the composer accepts.
+- [Evidence](references/evidence.md) and [test plan](references/test-plan.md): what a Miro paste confirmed, what is still open, and how to test more.
+
+`python3 scripts/selftest.py` checks the Python tools without Miro or a clipboard.
 
 ## Good to know
 

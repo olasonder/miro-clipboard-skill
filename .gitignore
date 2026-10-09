@@ -1,4 +1,4 @@
 *.json
-!examples/notes.json
+!examples/*.json
 __pycache__/
 .DS_Store

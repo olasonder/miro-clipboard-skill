@@ -42,6 +42,19 @@ def summary(document: dict) -> list[dict]:
             if isinstance(fields.get(key), str) and fields[key]:
                 row["text"] = plain_text(fields[key])
                 break
+        style = fields.get("style")
+        if isinstance(style, str):
+            try:
+                style = json.loads(style)
+            except ValueError:
+                style = None
+        if isinstance(style, dict):
+            for key in ("sbc", "bc", "lc"):
+                if isinstance(style.get(key), int) and style[key] >= 0:
+                    row["color"] = "#%06X" % style[key]
+                    break
+        if "shape" in fields:
+            row["shape_code"] = fields["shape"]
         if widget["type"] == "line":
             row["from"] = fields["primary"]["widgetIndex"]
             row["to"] = fields["secondary"]["widgetIndex"]
@@ -109,7 +122,18 @@ def main() -> None:
                         help="Read an edited full JSON document and re-encode it")
     parser.add_argument("--write-capture", type=Path,
                         help="Write the re-encoded public.html capture here")
+    parser.add_argument("--subset", help="Comma-separated object indexes to keep, e.g. 0,3,5; "
+                        "references are rebased. Use with --write-capture to make a template")
     args = parser.parse_args()
+    if args.subset:
+        if not args.write_capture:
+            parser.error("--subset needs --write-capture")
+        source_html = compose_module.load_html_capture(args.capture)
+        document = compose_module.decode_miro_json(source_html)
+        indexes = [int(part) for part in args.subset.split(",") if part.strip()]
+        compose_module.write_capture(source_html, compose_module.subset(document, indexes), args.write_capture)
+        print(f"Subset of {len(indexes)} objects saved locally: {args.write_capture}")
+        return
     if bool(args.encode_from) != bool(args.write_capture):
         parser.error("--encode-from and --write-capture must be used together")
     if args.encode_from:
